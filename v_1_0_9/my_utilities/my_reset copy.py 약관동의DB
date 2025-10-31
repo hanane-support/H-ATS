@@ -1,0 +1,51 @@
+# C:\Python\MY_PROJECT\v_1_0_9\my_utilities\my_reset.py (수정됨)
+
+# DB 초기화 함수 임포트
+from .my_db import reset_all_admin_passwords 
+# ★ 변경: my_config_agreement에서 약관 동의 상태 설정 함수 임포트
+from .my_config_agreement import set_agreement_status 
+from fastapi import Request 
+
+# ... (reset_database_to_initial_state 함수는 my_db.py의 함수를 호출하므로 변경 없음) ...
+def reset_database_to_initial_state():
+    """
+    관리자 ID 테이블을 초기화합니다 (DB 레코드 모두 삭제).
+    """
+    print("--- DB 초기화 시도 ---") # 디버깅용
+    try:
+        reset_all_admin_passwords() # my_db.py의 함수 호출
+        print("--- DB 초기화 성공 ---") # 디버깅용
+        return True
+    except Exception as e:
+        print(f"Database reset failed: {e}") # 예외 출력
+        return False
+
+def reset_configuration_files():
+    """
+    ★ 수정: my_admin_config.json 파일의 이용 약관 동의 상태를 'False'로 초기화합니다.
+    """
+    try:
+        # my_config_agreement.py의 set_agreement_status 함수를 사용하여 False로 설정
+        set_agreement_status(False)
+        return True
+    except Exception as e:
+        print(f"Config file (Agreement) reset failed: {e}")
+        return False
+
+def run_full_system_reset(request: Request) -> bool:
+    """
+    시스템의 모든 관리자 설정과 동의 상태를 초기화하고 세션을 삭제하는 통합 함수입니다.
+    """
+    # 1. 세션 정보 삭제 (로그아웃 처리)
+    if 'user_id' in request.session:
+        del request.session['user_id']
+    if 'is_authenticated' in request.session:
+        del request.session['is_authenticated']
+
+    # 2. DB 초기화 실행
+    db_success = reset_database_to_initial_state()
+    
+    # 3. 설정 파일 초기화 실행
+    config_success = reset_configuration_files()
+    
+    return db_success and config_success

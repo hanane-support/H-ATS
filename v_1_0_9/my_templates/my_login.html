@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 로그인</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 폰트: Inter로 원복 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif; /* Inter 폰트 적용 */
+            background-color: #121212; /* 메인 배경색 */
+        }
+        /* Custom scrollbar for dark mode */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 10px;
+        }
+        /* 추가: 팝업 배경 스타일 */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <div class="p-8 w-full max-w-md rounded-xl shadow-2xl" style="background-color: #1a202c;">
+        
+        <div class="text-center bg-blue-800 p-4 -mx-8 -mt-8 mb-8 rounded-t-xl">
+            <h1 class="text-2xl font-black text-gray-100 mb-1 leading-none">
+                H-ATS
+            </h1>
+            <p class="text-1xl font-bold text-gray-100 leading-tight">
+                Hanane Auto Trading System
+            </p>
+        </div>
+
+        <div class="text-center mb-6">
+            {% if is_setup_mode %}
+                <div class="border border-lime-500 p-3 rounded-lg shadow-xl mb-4">
+                    <p class="text-base font-bold text-lime-400">
+                        {% if form_action and form_action == '/admin/new_register' %}
+                            새 관리자를 등록합니다.
+                        {% else %}
+                            최초 접속자입니다.
+                        {% endif %}
+                    </p>
+                    <p class="text-base text-lime-400 mt-1">
+                        비밀번호는 Vultr Password 를 권장 합니다.
+                    </p>
+                </div>
+            {% else %}
+                <p class="text-base text-gray-300">
+                    하나네 자동 매매 시스템 관리자 콘솔입니다.
+                </p>
+            {% endif %}
+        </div>
+
+        {% if error %}
+        <div class="bg-red-700 border border-red-700 text-base text-white p-4 rounded-lg mb-4 text-center" role="alert">
+            {{ error | safe }}
+        </div>
+        {% endif %}
+
+        <form method="post" action="{{ form_action if form_action else '/admin/login' }}" class="space-y-6">
+            
+            <div>
+                <label for="username" class="block text-base font-medium text-gray-300">
+                    관리자 ID
+                </label>
+                <input type="text" id="username" name="username" required 
+                        class="mt-1 block w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out" 
+                        placeholder="관리자 ID를 입력해주세요.">
+            </div>
+            
+            <div>
+                <label for="password" class="block text-base font-medium text-gray-300">
+                        관리자 Password
+                </label>
+                <input type="password" id="password" name="password" required 
+                        class="mt-1 block w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500 shadow-sm transition duration-150 ease-in-out" 
+                        placeholder="관리자 비밀번호를 입력해주세요.">
+            </div>
+
+            <div class="text-center">
+                <p class="text-base font-semibold text-gray-400 mb-1">
+                    비밀번호 경로
+                </p>
+                <p class="text-base text-gray-500">
+                    Vultr - Overview - Password - 복사 - 붙여넣기
+                </p>
+            </div>
+
+            <button type="submit" 
+                    class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 focus:ring-offset-gray-900 transition duration-150 ease-in-out">
+                {% if is_setup_mode and form_action != '/admin/new_register' %}
+                    관리자 등록 및 로그인
+                {% elif form_action == '/admin/new_register' %}
+                    새 관리자 등록 및 로그인
+                {% else %}
+                    관리자 로그인
+                {% endif %}
+            </button>
+        </form>
+        
+        {% if not is_setup_mode and form_action != '/admin/new_register' %}
+        <div class="mt-4 pt-4 border-t border-gray-700 space-y-4"> 
+            
+            <a href="/admin/new_register"
+                class="w-full flex justify-center py-3 px-4 border border-green-600 rounded-lg shadow-lg text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 focus:ring-offset-gray-900 transition duration-150 ease-in-out">
+                새 관리자 등록
+            </a>
+            
+            <button id="resetButton" 
+                    class="w-full flex justify-center py-3 px-4 border border-red-600 rounded-lg shadow-lg text-base font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 focus:ring-offset-gray-900 transition duration-150 ease-in-out">
+                관리자 설정 초기화
+            </button>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <div id="resetModal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay">
+        <div class="bg-gray-800 rounded-xl p-6 shadow-2xl max-w-sm w-full border border-gray-700">
+            <h3 class="text-xl font-bold text-red-500 mb-4">🚨 관리자 설정 초기화</h3>
+            <p class="text-gray-300 mb-6">
+                정말로 관리자 설정을 초기화하시겠습니까? <br>
+                모든 DB 및 설정 파일이 초기 상태로 돌아가며, 다시 최초 등록을 해야 합니다.
+            </p>
+            <p class="text-red-500 font-semibold mb-6">
+                이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div class="flex justify-end space-x-3">
+                <button id="cancelReset" 
+                        class="py-2 px-4 rounded-lg text-gray-300 bg-gray-700 hover:bg-gray-600 transition duration-150">
+                    취소
+                </button>
+                <button id="confirmReset" 
+                        class="py-2 px-4 rounded-lg text-white bg-red-600 hover:bg-red-700 transition duration-150">
+                    초기화 실행
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const resetButton = document.getElementById('resetButton');
+            const resetModal = document.getElementById('resetModal');
+            const confirmReset = document.getElementById('confirmReset');
+            const cancelReset = document.getElementById('cancelReset');
+
+            if (resetButton) {
+                // 초기화 버튼 클릭 시 모달 표시
+                resetButton.addEventListener('click', function() {
+                    resetModal.classList.remove('hidden');
+                    resetModal.classList.add('flex');
+                });
+            }
+
+            // 취소 버튼 클릭 시 모달 닫기
+            cancelReset.addEventListener('click', function() {
+                resetModal.classList.add('hidden');
+                resetModal.classList.remove('flex');
+            });
+
+            // 초기화 실행 버튼 클릭 시 서버로 요청
+            confirmReset.addEventListener('click', async function() {
+                // 모달 닫기
+                resetModal.classList.add('hidden');
+                resetModal.classList.remove('flex');
+
+                try {
+                    const response = await fetch('/admin/reset_config', {
+                        method: 'POST',
+                    });
+
+                    // 서버 응답 처리
+                    if (response.ok) {
+                        alert("관리자 설정이 성공적으로 초기화되었습니다.\n최초 설정 페이지로 이동합니다.");
+                        window.location.href = "/admin/first_login";
+
+                    } else {
+                        let errorMessage = '초기화 실패: 알 수 없는 서버 오류';
+                        try {
+                            const errorData = await response.json();
+                            errorMessage = `초기화 실패 (${response.status}): ${errorData.detail || '상세 오류 없음'}`;
+                        } catch (e) {
+                            errorMessage = `초기화 실패 (${response.status}): 서버가 응답을 반환했으나 처리할 수 없습니다.`;
+                        }
+                        alert(errorMessage);
+                    }
+                } catch (error) {
+                    alert('네트워크 오류 또는 서버 접속 실패: 초기화할 수 없습니다.');
+                    console.error('Reset Fetch Error:', error);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

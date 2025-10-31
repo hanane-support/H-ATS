@@ -1,0 +1,59 @@
+# C:\Python\MY_PROJECT\v_1_0_7\my_utilities\my_config_agreement.py
+
+import json
+from pathlib import Path
+from typing import Dict, Any
+
+# ==========================================================
+# 파일 경로 설정 (my_admin_config.json 사용)
+# ==========================================================
+
+CURRENT_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = CURRENT_DIR.parent 
+
+# ★ 파일 경로 변경: my_admin_config.json 사용
+CONFIG_FILE_PATH = PROJECT_ROOT / "my_admin_config.json"
+
+
+# ==========================================================
+# 헬퍼 함수: 파일 읽기 및 쓰기
+# ==========================================================
+
+def _read_config() -> Dict[str, Any]:
+    """설정 파일을 읽어 딕셔너리를 반환합니다. 파일이 없으면 빈 딕셔너리를 반환합니다."""
+    try:
+        if CONFIG_FILE_PATH.exists():
+            with open(CONFIG_FILE_PATH, 'r') as f:
+                return json.load(f)
+        return {}
+    except (json.JSONDecodeError, IOError):
+        return {}
+
+def _write_config(config_data: Dict[str, Any]):
+    """설정 딕셔너리를 파일에 저장합니다."""
+    try:
+        with open(CONFIG_FILE_PATH, 'w') as f:
+            json.dump(config_data, f, indent=4)
+    except IOError as e:
+        print(f"Error saving config: {e}")
+
+
+# ==========================================================
+# 약관 상태 관리 함수
+# ==========================================================
+
+def get_agreement_status() -> bool:
+    """약관 동의 상태(IS_AGREED)를 my_admin_config.json 파일에서 읽어옵니다."""
+    config = _read_config()
+    return config.get('IS_AGREED', False)
+
+def set_agreement_status(is_agreed: bool):
+    """약관 동의 상태(IS_AGREED)를 my_admin_config.json 파일에 저장합니다."""
+    # 1. 현재 설정 파일 내용을 읽어옵니다.
+    config = _read_config()
+    
+    # 2. 'IS_AGREED' 키만 업데이트합니다.
+    config['IS_AGREED'] = is_agreed
+    
+    # 3. 업데이트된 설정을 다시 파일에 저장합니다.
+    _write_config(config)
