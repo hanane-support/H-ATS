@@ -9,7 +9,7 @@ venv/
 # 로그, DB 파일
 *.log
 *.sqlite3
-my_admin_config.db
+*.db
 
 # IDE / 편집기 설정
 .vscode/
