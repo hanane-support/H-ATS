@@ -26,3 +26,6 @@ Thumbs.db
 *copy*.py
 *copy*.txt
 *copy*.sh
+
+# 캐디파일
+Caddyfile.
