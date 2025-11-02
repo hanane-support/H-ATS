@@ -6,10 +6,9 @@ __pycache__/
 venv/
 .env/
 
-# 로그, DB 파일
+# 로그
 *.log
 *.sqlite3
-*.db
 
 # IDE / 편집기 설정
 .vscode/
@@ -27,5 +26,8 @@ Thumbs.db
 *copy*.txt
 *copy*.sh
 
-# 캐디파일
-Caddyfile.
+# DB 파일
+my_admin_config.db
+
+# 캐디 파일
+Caddyfile
