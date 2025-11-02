@@ -5,7 +5,7 @@ import os
 from typing import Optional, Tuple
 
 # DB 파일 경로 설정
-DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'admin_config.db')
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'my_admin_config.db')
 
 def get_db_connection():
     """SQLite DB 연결 객체를 반환합니다."""
@@ -34,6 +34,18 @@ def init_db():
         print("컬럼 'is_agreed'가 없어 ALTER TABLE로 추가합니다.")
         cursor.execute("ALTER TABLE admin ADD COLUMN is_agreed INTEGER DEFAULT 0 NOT NULL")
         
+    conn.commit()
+    conn.close()
+
+    # 'config' 테이블: 키-값 저장용 (예: CADDY_DOMAIN, CADDY_SECURITY_APPLIED 등)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS config (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )
+    """)
     conn.commit()
     conn.close()
 
@@ -149,6 +161,45 @@ def reset_all_admin_passwords():
     conn.commit()
     conn.close()
     
+# -------------------------------------------------------------
+# 설정(Config) 키-값 저장소 함수
+# -------------------------------------------------------------
+def set_config_value(key: str, value: str) -> bool:
+    """
+    주어진 키에 대해 값(value)을 저장하거나 업데이트합니다.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)",
+            (key, value)
+        )
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"DB set_config_value 오류: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_config_value(key: str) -> Optional[str]:
+    """
+    주어진 키의 값을 반환합니다. 없으면 None.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT value FROM config WHERE key = ?", (key,))
+        row = cursor.fetchone()
+        if row:
+            return row[0]
+        return None
+    except sqlite3.Error as e:
+        print(f"DB get_config_value 오류: {e}")
+        return None
+    finally:
+        conn.close()
 # -------------------------------------------------------------
 # 이용 약관 동의 상태 관리 함수 (DB 기반)
 # -------------------------------------------------------------

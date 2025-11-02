@@ -181,6 +181,13 @@
         width: 100%;
         box-sizing: border-box; 
     }
+
+    /* 읽기 전용 현재 아이디 색상을 더 밝은 파란색으로 표시
+       inline style가 있어도 우선권을 주기 위해 !important 사용 */
+    .input-group input#current-id {
+        color: var(--subtitle-color) !important; /* 밝은 파란색 */
+        opacity: 1 !important; /* 읽기전용으로 낮아진 불투명도 보정 */
+    }
     .small-button {
         padding: 10px 15px;
         border: none;

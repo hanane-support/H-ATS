@@ -37,7 +37,7 @@ display: flex;
 width: 100%;
 }
 
-/* 🟢 [반영됨] 사용자 설정 너비 200px */
+/* 🟢 [반영됨] 사용자 설정 너비 190px */
 .sidebar {
 width: 190px;
 background-color: var(--sidebar-bg-dark);
@@ -45,7 +45,7 @@ padding: 20px 0;
 box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
 display: flex;
 flex-direction: column;
-align-items: center;
+align-items: stretch; /* center에서 stretch로 변경 */
 flex-shrink: 0;
 }
 
@@ -57,15 +57,27 @@ padding: 0 15px;
 font-size: 1.5em;
 }
 
-.sidebar ul { list-style: none; padding: 0; width: 100%; }
-.sidebar ul li { width: 100%; }
+.sidebar ul { 
+    list-style: none; 
+    padding: 0; 
+    margin: 0;
+    width: 100%; 
+}
+.sidebar ul li { 
+    width: 100%; 
+    margin: 0;
+    padding: 0;
+}
 .sidebar ul li a {
-display: block; padding: 15px 26px;
+display: block; 
+padding: 15px 0; /* 상하 패딩만 유지 */
 color: var(--text-color-light) !important; 
 text-decoration: none; transition: background-color 0.2s, border-left-color 0.2s, opacity 0.3s;
 border-left: 5px solid transparent; text-align: center; opacity: 1.0; pointer-events: auto;
 font-weight: bold;
-box-sizing: border-box; 
+box-sizing: border-box;
+width: 100%;
+margin: 0;
 }
 
 /* 비활성화된 탭 스타일 */
@@ -76,6 +88,7 @@ box-sizing: border-box;
 background-color: var(--sidebar-item-hover-dark); 
 color: var(--text-color-light) !important; 
 box-shadow: 0px 0px 0px rgba(0, 123, 255, 0.5); /* x-offset, y-offset, blur, color */
+width: 100%; /* 부모 요소의 전체 너비를 사용 */
 }
 
 /* 활성화된 탭 스타일 */
@@ -85,6 +98,7 @@ border-left-color: var(--accent-color);
 color: var(--text-color-light) !important; 
 font-weight: bold; opacity: 1.0 !important; pointer-events: auto !important;
 box-shadow: 0px 0px 0px rgba(0, 123, 255, 0.7); /* x-offset, y-offset, blur, color */
+width: 100%; /* 부모 요소의 전체 너비를 사용 */
 }
 
 .main-content { flex-grow: 1; padding: 40px; background-color: var(--bg-color-black); }
@@ -92,6 +106,7 @@ box-shadow: 0px 0px 0px rgba(0, 123, 255, 0.7); /* x-offset, y-offset, blur, col
 background-color: var(--header-bg-dark); color: var(--text-color-light);
 padding: 15px 20px; border-radius: 8px; margin-bottom: 30px; 
 box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); display: flex; justify-content: center; align-items: center;
+position: relative;
 }
 .header h1 { margin: 0; font-size: 1.5em; border-bottom: none; padding-bottom: 0; }
 
@@ -106,21 +121,34 @@ box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); display: flex; justify-content: center
 
 
 .cta-button {
-display: inline-block; background-color: #dc3545; color: white; padding: 15px 25px; 
-border: none; border-radius: 0; cursor: pointer; text-decoration: none;
+display: block; 
+background-color: #dc3545; 
+color: white; 
+padding: 15px 0; 
+border: none; 
+border-radius: 0; 
+cursor: pointer; 
+text-decoration: none;
 font-weight: bold; 
-transition: background-color 0.3s; width: 100%; margin-top: 0; text-align: center;
-font-size: 1em; 
+transition: background-color 0.3s; 
+width: 100%; 
+margin: 0; 
+text-align: center;
+font-size: 1em;
+box-sizing: border-box;
 }
 .cta-button:hover { background-color: #c82333; }
 .sidebar ul li:last-child { margin-bottom: 0; }
 </style>
 
-{% block extra_head_styles %}{% endblock %} 
+{% block extra_head_styles %}{% endblock %}
+{# 모바일 반응형 코드 임포트 (이름 변경: my_base_mobile.html) #}
+{% include "my_base_mobile.html" %} 
 
 </head>
 
 <body>
+<div class="sidebar-overlay"></div>
 <div class="container">
 <aside class="sidebar">
 <h2>H-ATS</h2>
@@ -129,7 +157,7 @@ font-size: 1em;
 <li><a href="/admin/agreement"{% if current_page == '/admin/agreement' %} class="active"{% endif %}>이용 약관</a></li>
 <li><a href="/admin/intro"{% if current_page == '/admin/intro' %} class="active"{% endif %}>소개</a></li>
 
-<li><a href="/admin/domain"{% if current_page == '/admin/domain' %} class="active"{% endif %}>도메인 연결 및 보안</a></li>
+<li><a href="/admin/domain"{% if current_page == '/admin/domain' %} class="active"{% endif %}>도메인 및 보안</a></li>
 <li><a href="#">국내 거래소</a></li>
 <li><a href="#">해외 거래소</a></li>
 <li><a href="#">메신저</a></li>
@@ -149,6 +177,11 @@ font-size: 1em;
 
 <main class="main-content">
 <header class="header">
+<button class="menu-toggle" id="menu-toggle" aria-label="메뉴 토글">
+<span></span>
+<span></span>
+<span></span>
+</button>
 <h1>{% block page_header %}H-ATS Admin{% endblock %}</h1>
 </header>
 
@@ -228,9 +261,83 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-
     // ✅ [핵심] 3. 페이지 로드 시 메뉴 상태를 설정
-    updateMenuState(); 
+    updateMenuState();
+    
+    // ==========================================================
+    // 4. 사이드바 너비를 활성 탭 너비에 맞추기 (PC 전용)
+    // ==========================================================
+    const sidebar = document.querySelector('.sidebar');
+    
+    function adjustSidebarWidth() {
+        // PC 화면에서만 적용 (모바일에서는 고정 너비)
+        if (window.innerWidth <= 768) {
+            if (sidebar) {
+                sidebar.style.width = '190px'; // 모바일에서는 고정 너비
+            }
+            return;
+        }
+        
+        const activeLink = document.querySelector('.sidebar ul li a.active');
+        if (activeLink && sidebar) {
+            // 활성 링크의 텍스트 내용 가져오기
+            const activeText = activeLink.textContent.trim();
+            
+            // 텍스트 너비를 정확히 측정하기 위한 임시 span 생성
+            const tempSpan = document.createElement('span');
+            tempSpan.style.visibility = 'hidden';
+            tempSpan.style.position = 'absolute';
+            tempSpan.style.whiteSpace = 'nowrap';
+            // 활성 링크와 동일한 스타일 적용
+            const linkStyle = window.getComputedStyle(activeLink);
+            tempSpan.style.fontSize = linkStyle.fontSize;
+            tempSpan.style.fontWeight = linkStyle.fontWeight;
+            tempSpan.style.fontFamily = linkStyle.fontFamily;
+            tempSpan.style.letterSpacing = linkStyle.letterSpacing;
+            tempSpan.textContent = activeText;
+            
+            document.body.appendChild(tempSpan);
+            const textWidth = tempSpan.offsetWidth;
+            document.body.removeChild(tempSpan);
+            
+            // 활성 탭의 전체 너비 = 텍스트 너비 + 좌우 padding (26px * 2) + 왼쪽 border (5px)
+            const activeTabWidth = textWidth + 52 + 5;
+            
+            // 사이드바 너비를 활성 탭 너비와 정확히 맞춤
+            // 최소 너비 보장
+            const finalWidth = Math.max(activeTabWidth, 190);
+            sidebar.style.width = finalWidth + 'px';
+        } else if (sidebar) {
+            // 활성 링크가 없으면 기본 너비 유지
+            sidebar.style.width = '190px';
+        }
+    }
+    
+    // 초기 실행 및 리사이즈 이벤트
+    // 약간의 딜레이를 주어 DOM이 완전히 로드된 후 실행
+    setTimeout(() => {
+        adjustSidebarWidth();
+    }, 100);
+    
+    window.addEventListener('resize', () => {
+        adjustSidebarWidth();
+    });
+    
+    // 활성 링크가 변경될 때마다 너비 조정
+    const observer = new MutationObserver(() => {
+        setTimeout(() => {
+            adjustSidebarWidth();
+        }, 50);
+    });
+    
+    if (sidebar) {
+        observer.observe(sidebar, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class']
+        });
+    }
 });
 </script>
 

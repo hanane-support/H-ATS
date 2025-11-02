@@ -1,0 +1,198 @@
+{# 모바일 반응형 관련 스타일 및 스크립트 (이전 my_mobile_base.html에서 이름 변경) #}
+
+<style>
+/* 햄버거 메뉴 버튼 스타일 */
+.menu-toggle {
+display: none;
+position: absolute;
+left: 20px;
+top: 50%;
+transform: translateY(-50%);
+background: none;
+border: none;
+cursor: pointer;
+z-index: 1001;
+padding: 8px;
+color: var(--text-color-light);
+font-size: 24px;
+line-height: 1;
+}
+
+.menu-toggle:hover {
+opacity: 0.8;
+}
+
+.menu-toggle span {
+display: block;
+width: 25px;
+height: 3px;
+background-color: var(--text-color-light);
+margin: 5px 0;
+transition: all 0.3s;
+border-radius: 3px;
+}
+
+.menu-toggle.active span:nth-child(1) {
+transform: rotate(45deg) translate(8px, 8px);
+}
+
+.menu-toggle.active span:nth-child(2) {
+opacity: 0;
+}
+
+.menu-toggle.active span:nth-child(3) {
+transform: rotate(-45deg) translate(7px, -7px);
+}
+
+/* 사이드바 오버레이 (모바일용) */
+.sidebar-overlay {
+display: none;
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-color: rgba(0, 0, 0, 0.5);
+z-index: 999;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+.menu-toggle {
+	display: block;
+}
+
+.sidebar {
+	position: fixed;
+	top: 0;
+	left: -190px;
+	height: 100vh;
+	z-index: 1000;
+	transition: left 0.3s ease;
+}
+
+.sidebar.open {
+	left: 0;
+}
+
+.sidebar-overlay.active {
+	display: block;
+}
+
+.main-content {
+	padding: 20px;
+	width: 100%;
+}
+
+.header {
+	padding-left: 60px; /* 햄버거 메뉴 공간 확보 */
+	position: sticky;
+	top: 0;
+	z-index: 998;
+	margin-bottom: 20px;
+}
+
+/* 모바일에서 햄버거로 인해 가운데 정렬이 시각적으로 오른쪽으로 치우치는 현상 보정
+   제목(h1)을 왼쪽으로 약 15px 이동시켜 가운데에 보이도록 함 */
+.header h1 {
+	transform: translateX(-15px);
+}
+
+.container {
+	position: relative;
+}
+}
+
+@media (max-width: 480px) {
+.main-content {
+	padding: 15px;
+}
+
+.header h1 {
+	font-size: 1.2em;
+}
+}
+</style>
+
+<script>
+// 모바일 햄버거 메뉴 토글 기능
+document.addEventListener('DOMContentLoaded', () => {
+	// 모바일에서만 동작하도록 확인
+	if (window.innerWidth > 768) {
+		return;
+	}
+    
+	const menuToggle = document.getElementById('menu-toggle');
+	const sidebar = document.querySelector('.sidebar');
+	const overlay = document.querySelector('.sidebar-overlay');
+	const menuLinks = document.querySelectorAll('.sidebar ul li a');
+	const logoutForm = document.getElementById('logout-form');
+    
+	function toggleSidebar() {
+		const isOpen = sidebar.classList.contains('open');
+		if (isOpen) {
+			sidebar.classList.remove('open');
+			overlay.classList.remove('active');
+			menuToggle.classList.remove('active');
+			document.body.style.overflow = ''; // 스크롤 복원
+		} else {
+			sidebar.classList.add('open');
+			overlay.classList.add('active');
+			menuToggle.classList.add('active');
+			document.body.style.overflow = 'hidden'; // 스크롤 방지
+		}
+	}
+    
+	if (menuToggle && sidebar && overlay) {
+		// 햄버거 메뉴 버튼 클릭
+		menuToggle.addEventListener('click', (e) => {
+			e.stopPropagation();
+			toggleSidebar();
+		});
+        
+		// 오버레이 클릭 시 사이드바 닫기
+		overlay.addEventListener('click', () => {
+			toggleSidebar();
+		});
+        
+		// 모바일에서 링크 클릭 시 사이드바 닫기
+		menuLinks.forEach(link => {
+			link.addEventListener('click', () => {
+				if (window.innerWidth <= 768) {
+					toggleSidebar();
+				}
+			});
+		});
+        
+		// 로그아웃 버튼 클릭 시 사이드바 닫기
+		if (logoutForm) {
+			logoutForm.addEventListener('submit', () => {
+				if (window.innerWidth <= 768) {
+					toggleSidebar();
+				}
+			});
+		}
+	}
+    
+	// 리사이즈 이벤트 처리
+	let resizeTimer;
+	window.addEventListener('resize', () => {
+		clearTimeout(resizeTimer);
+		resizeTimer = setTimeout(() => {
+			if (window.innerWidth > 768) {
+				// PC 화면으로 전환 시 사이드바 닫기
+				if (sidebar) {
+					sidebar.classList.remove('open');
+				}
+				if (overlay) {
+					overlay.classList.remove('active');
+				}
+				if (menuToggle) {
+					menuToggle.classList.remove('active');
+				}
+				document.body.style.overflow = '';
+			}
+		}, 250);
+	});
+});
+</script>

@@ -16,6 +16,8 @@ from my_routers.my_logout import router as logout_router
 from my_routers.my_agreement import router as agreement_router 
 from my_routers.my_intro import router as intro_router 
 from my_routers.my_settings import router as settings_router
+from my_routers.my_domain import router as domain_router
+from my_routers.my_security import router as security_router
 # 파일 존재 확인 유틸리티 임포트
 from my_utilities.my_config_password import admin_config_check 
 
@@ -26,7 +28,7 @@ templates = Jinja2Templates(directory="my_templates")
 # 1. 앱 시작 시 DB 초기화 및 세션 미들웨어 추가
 # ==========================================================
 
-# ✅ DB 초기화: 앱 시작 시 admin_config.db 파일을 확인 및 생성합니다.
+# ✅ DB 초기화: 앱 시작 시 my_admin_config.db 파일을 확인 및 생성합니다.
 init_db() 
 
 # NOTE: SECRET_KEY는 반드시 안전하게 관리되는 임의의 긴 문자열이어야 합니다.
@@ -50,6 +52,8 @@ app.include_router(logout_router, prefix="/admin")
 app.include_router(agreement_router, prefix="/admin") 
 app.include_router(intro_router, prefix="/admin") 
 app.include_router(settings_router, prefix="/admin")
+app.include_router(domain_router, prefix="/admin")
+app.include_router(security_router, prefix="/admin")
 # ==========================================================
 # 관리자 기본 경로 조건부 리디렉션
 # ==========================================================
