@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 import subprocess
 import os
 import json # Request.json() 처리를 위해 추가
+from my_utilities.my_db import get_domain_security_config, update_domain_security_config
 
 # 템플릿 디렉토리가 'my_templates'에 있다고 가정합니다. (환경에 따라 수정 필요)
 templates = Jinja2Templates(directory="my_templates")
@@ -86,17 +87,25 @@ def is_caddy_active() -> bool:
 @domain_security_router.get("/domain_security", response_class=HTMLResponse)
 async def domain_security_manager(request: Request):
     """
-    도메인 보안 설정 페이지(my_domain_security.html)를 렌더링하고 보안 상태를 전달합니다.
+    도메인 보안 설정 페이지(my_domain_security.html)를 렌더링하고,
+    DB에 저장된 현재 도메인 및 보안 상태를 전달합니다.
     """
-    if is_caddy_active():
-        current_security_status = 'HTTPS'
+    admin_id = request.session.get("user_id")
+    if not admin_id:
+        # admin_id가 없으면 로그인 페이지로 리디렉션 (또는 오류 처리)
+        # 이 부분은 실제 앱의 인증 정책에 맞게 수정해야 합니다.
+        # 여기서는 간단히 빈 컨텍스트로 렌더링하거나, 기본값을 사용합니다.
+        domain_config = {"domain_name": "없음", "security_status": "HTTP"}
     else:
-        current_security_status = 'HTTP'
+        # DB에서 현재 도메인 및 보안 상태를 가져옵니다.
+        domain_config = get_domain_security_config(admin_id)
 
     context = {
         "request": request,
-        "security_status": current_security_status
+        "domain_name": domain_config.get("domain_name", "없음"),
+        "security_status": domain_config.get("security_status", "HTTP")
     }
+    
     return templates.TemplateResponse(
         "my_domain_security.html",
         context
@@ -109,55 +118,69 @@ async def domain_security_manager(request: Request):
 @domain_security_router.post("/domain_security/apply_security")
 async def apply_security(request: Request):
     """
-    my_caddyfile.py를 실행하여 보안 적용을 시도합니다.
+    my_caddyfile.py를 실행하여 보안 적용을 시도하고, 성공 시 DB에 상태를 저장합니다.
     """
-    domain_to_register = None
-    # IP를 받지 않음 (기존 로직 유지)
+    admin_id = request.session.get("user_id")
+    if not admin_id:
+        return JSONResponse(
+            status_code=401,
+            content={"success": False, "message": "인증되지 않은 요청입니다."}
+        )
 
+    domain_to_register = None
     try:
         data = await request.json()
         domain_to_register = data.get("domain")
-        # IP 주소 처리는 my_caddyfile.py 내부에서 처리한다고 가정하고, 여기서는 도메인만 전달합니다.
-
         if not domain_to_register:
-             return JSONResponse(
-                 status_code=400,
-                 content={"success": False, "message": "도메인 정보가 요청 본문에 포함되어 있지 않습니다."}
-             )
-
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "message": "도메인 정보가 요청 본문에 포함되어 있지 않습니다."}
+            )
         print(f"클라이언트에서 받은 도메인: {domain_to_register}")
     except json.JSONDecodeError:
         return JSONResponse(
-             status_code=400,
-             content={"success": False, "message": "유효하지 않은 JSON 형식입니다."}
-         )
+            status_code=400,
+            content={"success": False, "message": "유효하지 않은 JSON 형식입니다."}
+        )
     except Exception as e:
         return JSONResponse(
-             status_code=500,
-             content={"success": False, "message": f"요청 처리 중 오류 발생: {e}"}
-         )
+            status_code=500,
+            content={"success": False, "message": f"요청 처리 중 오류 발생: {e}"}
+        )
 
-    # 2. my_caddyfile.py 실행 로직 (도메인 인수를 전달)
-    # run_caddyfile_script가 *args를 받으므로, 단일 인수로 호출해도 문제 없습니다.
+    # Caddyfile 스크립트 실행
     success, message = run_caddyfile_script(domain_to_register)
-
     if not success:
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"my_caddyfile.py 실행 실패: {message}"}
         )
 
-    # 3. Caddy 서버 상태 확인 (더미)
+    # Caddy 서버 상태 확인 (더미)
     if not is_caddy_active():
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": "Caddyfile 적용 성공, 하지만 Caddy 서버 활성화 상태 확인 실패."}
         )
 
+    # DB에 도메인 정보 업데이트
+    db_success = update_domain_security_config(admin_id, domain_to_register, 'HTTPS')
+    if not db_success:
+        # DB 업데이트 실패 시 사용자에게 알리지만, Caddy 설정은 이미 적용되었을 수 있음을 인지
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Caddyfile 적용 성공, 하지만 DB에 도메인 정보 저장 실패."}
+        )
+
     # 모든 과정 성공 시
     return JSONResponse(
         status_code=200,
-        content={"success": True, "message": message or "Caddyfile 생성/덮어쓰기 완료."}
+        content={
+            "success": True, 
+            "message": message or "Caddyfile 생성/덮어쓰기 및 DB 업데이트 완료.",
+            "domain_name": domain_to_register, # 응답에 현재 도메인 이름 추가
+            "security_status": "HTTPS" # 응답에 현재 보안 상태 추가
+        }
     )
 
 # ==========================================================
@@ -167,54 +190,66 @@ async def apply_security(request: Request):
 @domain_security_router.post("/domain_security/release_security")
 async def release_security(request: Request):
     """
-    my_caddyfile.py를 실행하여 도메인 보안을 해제하고 IP 기반으로 복구합니다.
+    my_caddyfile.py를 실행하여 도메인 보안을 해제하고, 성공 시 DB 상태를 업데이트합니다.
     """
-    # domain_to_release는 필요 없지만, ip_address는 복구 Caddyfile 생성을 위해 필수적입니다.
-    ip_address = None
+    admin_id = request.session.get("user_id")
+    if not admin_id:
+        return JSONResponse(
+            status_code=401,
+            content={"success": False, "message": "인증되지 않은 요청입니다."}
+        )
 
+    ip_address = None
     try:
         data = await request.json()
-        # IP 주소 정보를 요청 본문에서 가져옵니다.
         ip_address = data.get("ip")
-
         if not ip_address:
-            # IP 주소가 없으면 복구 Caddyfile을 만들 수 없으므로 400 오류 반환
             return JSONResponse(
-                 status_code=400,
-                 content={"success": False, "message": "IP 주소 정보가 요청 본문에 포함되어 있지 않습니다."}
-             )
-
+                status_code=400,
+                content={"success": False, "message": "IP 주소 정보가 요청 본문에 포함되어 있지 않습니다."}
+            )
         print(f"클라이언트에서 받은 해제 요청 IP: {ip_address}")
     except json.JSONDecodeError:
         return JSONResponse(
-             status_code=400,
-             content={"success": False, "message": "유효하지 않은 JSON 형식입니다."}
-         )
+            status_code=400,
+            content={"success": False, "message": "유효하지 않은 JSON 형식입니다."}
+        )
     except Exception as e:
         return JSONResponse(
-             status_code=500,
-             content={"success": False, "message": f"요청 처리 중 오류 발생: {e}"}
-         )
+            status_code=500,
+            content={"success": False, "message": f"요청 처리 중 오류 발생: {e}"}
+        )
 
-    # 2. my_caddyfile.py 실행 로직 (해제 명령과 IP 인수를 전달)
-    # my_caddyfile.py가 첫 번째 인수를 도메인(여기서는 IP로 대체), 두 번째를 명령으로 인식합니다.
+    # Caddyfile 스크립트 실행 (해제)
     success, message = run_caddyfile_script(ip_address, "release")
-
     if not success:
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": f"my_caddyfile.py 실행 실패: {message}"}
         )
 
-    # 3. Caddy 서버 상태 확인 (더미)
+    # Caddy 서버 상태 확인 (더미)
     if not is_caddy_active():
         return JSONResponse(
             status_code=500,
             content={"success": False, "message": "Caddyfile 해제 성공, 하지만 Caddy 서버 활성화 상태 확인 실패."}
         )
 
+    # DB에서 도메인 정보 업데이트 (해제 상태로)
+    db_success = update_domain_security_config(admin_id, "없음", 'HTTP')
+    if not db_success:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "message": "Caddyfile 해제 성공, 하지만 DB 상태 업데이트 실패."}
+        )
+
     # 모든 과정 성공 시
     return JSONResponse(
         status_code=200,
-        content={"success": True, "message": message or "Caddyfile 해제/복구 완료."}
+        content={
+            "success": True, 
+            "message": message or "Caddyfile 해제/복구 및 DB 업데이트 완료.",
+            "domain_name": "없음",
+            "security_status": "HTTP"
+        }
     )
