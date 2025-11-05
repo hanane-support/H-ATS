@@ -129,4 +129,4 @@ echo ">> Caddy 서비스 시작 및 설정 적용..."
 systemctl enable caddy
 systemctl restart caddy
 
-echo ">> 배포 스크립트가 완료되었습니다. 상태는 'server_log'를 확인하십시오."
+echo ">> 배포 스크립트가 완료되었습니다. 상태는 'server_log'를 확인하십시오." 
