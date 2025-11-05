@@ -3,27 +3,17 @@ import sys
 
 # 웹 서버 시작 시 실행되는 것을 방지하기 위해 if __name__ == '__main__': 블록으로 감쌉니다.
 if __name__ == '__main__':
+    # Caddyfile 경로를 /etc/caddy/Caddyfile 로 고정합니다.
+    file_name = "/etc/caddy/Caddyfile"
+
     # --- 인수 처리 로직 ---
     args = sys.argv[1:]
     if not args:
-        print("오류: 인수가 제공되지 않았습니다. 사용법: python my_caddyfile.py [Caddyfile_경로] <도메인/IP> [release]")
+        print("오류: 인수가 제공되지 않았습니다. 사용법: python my_caddyfile.py <도메인/IP> [release]")
         sys.exit(1)
 
-    # 첫 번째 인수가 파일 경로인지 확인 (경로 구분자 포함 여부로 판단)
-    is_path_provided = '/' in args[0] or '\\' in args[0]
-
-    if is_path_provided:
-        if len(args) < 2:
-            print("오류: Caddyfile 경로와 도메인/IP 인수가 모두 제공되어야 합니다.")
-            sys.exit(1)
-        file_name = args[0]
-        dynamic_domain = args[1]
-        command = args[2].lower() if len(args) > 2 else 'register'
-    else:
-        # 기존 로직 (파일 경로가 제공되지 않은 경우, 현재 디렉토리에 Caddyfile 생성)
-        file_name = "Caddyfile"
-        dynamic_domain = args[0]
-        command = args[1].lower() if len(args) > 1 else 'register'
+    dynamic_domain = args[0]
+    command = args[1].lower() if len(args) > 1 else 'register'
 
     # 고정 IP 주소
     MY_IP = "61.85.61.62"
