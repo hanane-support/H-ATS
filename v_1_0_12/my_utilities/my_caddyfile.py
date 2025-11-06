@@ -1,36 +1,30 @@
 import os
 import sys
+import subprocess # Caddy 서비스 재로드 안내 메시지 출력을 위해 포함할 수 있지만, 여기서는 로직만 유지
 
 # 웹 서버 시작 시 실행되는 것을 방지하기 위해 if __name__ == '__main__': 블록으로 감쌉니다.
 if __name__ == '__main__':
+    # Caddyfile 경로를 /etc/caddy/Caddyfile 로 고정합니다.
+    file_name = "/etc/caddy/Caddyfile"
 
     # --- 인수 처리 로직 ---
-    # 예상 인수: [Caddyfile 경로, 도메인/IP, command]
     args = sys.argv[1:]
-    if len(args) < 3:
-        # Caddyfile 경로, dynamic_host, command 3개의 인수가 필요합니다.
-        sys.stderr.write("오류: 인수가 부족합니다. 사용법: python my_caddyfile.py <파일 경로> <도메인/IP> <명령>\n")
+    if not args:
+        print("오류: 인수가 제공되지 않았습니다. 사용법: python my_caddyfile.py <도메인/IP> [release]")
         sys.exit(1)
 
-    file_name = args[0] # my_domain_security.py에서 전달받은 Caddyfile 경로
-    dynamic_host = args[1] # 도메인 등록 시: 도메인 이름, 해제 시: IP 주소
-    command = args[2].lower() # register 또는 release
+    dynamic_domain = args[0]
+    command = args[1].lower() if len(args) > 1 else 'register'
 
-    # 고정 IP 주소 (HTTP 블록에 사용)
-    # 사용자님이 입력하신 MY_IP: 61.85.61.62
-    MY_IP = "61.85.61.62"
-
-    # --- 공통 설정 (Admin API) ---
-    admin_config = f"""# Caddy Admin API를 로컬호스트에 바인딩
-{{
-    admin 127.0.0.1:2019
-}}
-"""
+    # 🚨 수정: 환경 변수에서 허용된 클라이언트 IP를 가져옵니다.
+    # 환경 변수가 설정되어 있지 않으면 기본값 '61.85.61.62'를 사용합니다.
+    # 사용자의 현재 IP로 변경하려면 'MY_AUTHORIZED_IP' 환경 변수를 설정하세요.
+    MY_IP = os.environ.get("MY_AUTHORIZED_IP", "61.85.61.62")
 
     # --- HTTP 설정 (IP 기반 접근 및 거부) ---
-    # MY_IP를 사용하여 IP 기반 접근 제어 설정
+    # 이 설정은 MY_IP로 접근하는 클라이언트만 reverse_proxy를 통해 FastAPI에 접근하도록 허용합니다.
     http_config = f"""
-# 초기 접근: MY_IP로 접근하는 관리자 콘솔만 허용
+# HTTP (MY_IP로 접근하는 경우)
 :80 {{
     @myip {{
         remote_ip {MY_IP}
@@ -47,10 +41,9 @@ if __name__ == '__main__':
 }}"""
 
     # --- HTTPS 설정 (도메인 등록 시) ---
-    # dynamic_host에 도메인 이름이 들어오므로 이를 사용합니다.
     https_config_part = f"""
 # HTTPS (도메인으로 접근하는 경우, 자동 인증서 발급)
-{dynamic_host} {{
+{dynamic_domain} {{
     reverse_proxy 127.0.0.1:8000
 }}"""
 
@@ -58,28 +51,21 @@ if __name__ == '__main__':
     caddyfile_content = ""
     action_description = ""
 
-    # Caddyfile은 항상 Admin API 설정으로 시작해야 합니다.
-    base_content = f"{admin_config.strip()}\n{http_config.strip()}"
-
     if command == 'release':
-        # 해제 모드: Admin API와 HTTP 설정만 포함하여 복구
-        caddyfile_content = base_content
-        action_description = f"도메인 해제 (HTTP 복구)"
+        # 해제 모드: HTTP 설정만으로 복구 (IP 기반 접근 제어 유지)
+        caddyfile_content = http_config.strip()
+        action_description = f"도메인 해제 (HTTP 복구 - 허용 IP: {MY_IP})"
     else:
-        # 등록 모드 (기본): Admin API, HTTP, HTTPS 설정 모두 포함
-        caddyfile_content = f"{base_content}\n\n{https_config_part.strip()}"
-        action_description = f"도메인 '{dynamic_host}' 등록 (HTTPS 적용)"
+        # 등록 모드 (기본): HTTP(IP 기반)와 HTTPS(도메인) 통합
+        caddyfile_content = http_config.strip() + "\\n\\n" + https_config_part.strip()
+        action_description = f"도메인 등록 (HTTPS) 및 IP 접근 제어 (허용 IP: {MY_IP})"
 
-
-    # 4. 파일에 내용 쓰기
+    # 4. Caddyfile에 내용 쓰기
     try:
-        # 이 스크립트는 'sudo python my_caddyfile.py ...' 형태로 실행되어야 합니다.
-        with open(file_name, "w") as f:
+        with open(file_name, 'w') as f:
             f.write(caddyfile_content)
-
-        print(f"성공: {action_description} 완료.")
-
+        print(f"성공: Caddyfile '{file_name}'이(가) 다음과 같이 업데이트되었습니다: {action_description}")
+        print("참고: Caddyfile 변경 사항을 적용하려면 'sudo systemctl reload caddy' 명령을 실행해야 합니다.")
     except Exception as e:
-        # 오류 발생 시 stderr로 출력
-        sys.stderr.write(f"오류: Caddyfile 작성 실패: {e}\n")
+        print(f"오류: Caddyfile '{file_name}'에 쓰는 중 오류 발생: {e}")
         sys.exit(1)
