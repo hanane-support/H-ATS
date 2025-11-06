@@ -41,8 +41,9 @@ def run_caddyfile_script(*args: str) -> tuple[bool, str]:
         return False, error_msg
 
     try:
-        # Caddyfile 스크립트를 파이썬 인터프리터로 실행하고, 가변 인수를 전달합니다.
-        command_list = ["python", script_path] + list(args)
+        # Caddyfile 스크립트를 현재 인터프리터로 실행합니다. (일반적으로 Python 3)
+        # sys.executable은 현재 실행 중인 파이썬 인터프리터의 경로입니다.
+        command_list = [sys.executable, script_path] + list(args)
 
         print(f">> my_caddyfile.py 실행 명령: {' '.join(command_list)}") # 실행 명령 로그 추가
 
