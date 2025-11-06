@@ -545,7 +545,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ domain: domain, ip: ip }) // IP 추가
+                    body: JSON.stringify({ domain: domain }) // IP 제거
                 });
 
                 const data = await response.json();
@@ -612,8 +612,8 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    // 해제 시 Caddyfile 복구를 위해 IP 주소를 보냄
-                    body: JSON.stringify({ ip: ip })
+                    // 해제 시 Caddyfile 복구를 위해 현재 도메인 이름을 보냄
+                    body: JSON.stringify({ current_domain: domainForRelease })
                 });
 
                 const data = await response.json();
