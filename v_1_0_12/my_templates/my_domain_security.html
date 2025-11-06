@@ -55,7 +55,8 @@
         <div class="button-group">
             <button id="registerDomainButton" class="small-button accent-color-bg full-width-button">도메인 등록</button>
 
-            <button id="releaseDomainButton" class="small-button delete-button full-width-button">도메인 해제</button>
+            <button id="releaseDomainButton" class="small-button delete-button full-width-button" disabled>도메인
+                해제</button>
         </div>
     </div>
 </div>
@@ -113,14 +114,29 @@
 
 {% block extra_head_styles %}
 <style>
+    :root {
+        --text-color-light: #e0e0e0;
+        --text-color-dark: #bdbdbd;
+        --header-bg-dark: #2c2c2c;
+        --sidebar-bg-dark: #212121;
+        --border-color-dark: #444;
+        --accent-color: #007bff;
+        /* 파란색 계열 유지 */
+    }
+
     .card {
         background-color: var(--header-bg-dark);
         padding: 30px;
         border-radius: 8px;
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
         border: 1px solid var(--border-color-dark);
+        max-width: 600px;
+        /* 최대 너비 제한 */
+        margin: 0 auto;
+        /* 중앙 정렬 */
     }
 
+    /* Modal Styling */
     .modal-overlay {
         position: fixed;
         top: 0;
@@ -157,10 +173,8 @@
         margin-top: 0;
     }
 
-    /* Success Header for general messages */
     .modal-header-success {
         color: #8BC34A;
-        /* status-value-success color */
         font-size: 1.5em;
         margin-bottom: 30px;
         margin-top: 0;
@@ -195,14 +209,14 @@
     }
 
     .card-title {
-        color: var(--subtitle-color);
+        color: var(--text-color-light);
         margin-top: 0;
         margin-bottom: 10px;
         font-size: 1.5em;
     }
 
     .security-recommendation-text {
-        color: var(--text-color-light);
+        color: var(--text-color-dark);
         margin-top: 5px;
         margin-bottom: 15px;
         line-height: 1.4;
@@ -237,13 +251,13 @@
     }
 
     .status-label {
-        color: var(--text-color-light);
+        color: var(--text-color-dark);
         display: inline-block;
         width: 80px;
     }
 
     .status-value {
-        color: var(--text-color-dark);
+        color: var(--text-color-light);
     }
 
     .status-value-ip {
@@ -254,15 +268,17 @@
     /* 보안 상태 표시를 위한 스타일 */
     .status-value-pending {
         color: #FFC107;
-        /* 주황색 또는 노란색 계열 */
+        /* 노란색/주황색 계열 */
     }
 
     .status-value-success {
         color: #8BC34A;
+        /* 녹색 */
     }
 
     .status-value-error {
         color: #EF5350;
+        /* 빨간색 */
     }
 
     .domain-input {
@@ -289,17 +305,22 @@
         border: none;
         border-radius: 4px;
         cursor: pointer;
-        transition: background-color 0.3s;
+        transition: background-color 0.3s, opacity 0.3s;
         color: var(--text-color-light);
         font-size: 1em;
         flex-grow: 1;
+    }
+
+    .small-button[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .accent-color-bg {
         background-color: var(--accent-color);
     }
 
-    .accent-color-bg:hover {
+    .accent-color-bg:hover:not([disabled]) {
         background-color: #0056b3;
     }
 
@@ -308,7 +329,7 @@
         color: white;
     }
 
-    .secondary-color-bg:hover {
+    .secondary-color-bg:hover:not([disabled]) {
         background-color: #5a6268;
     }
 
@@ -317,7 +338,7 @@
         color: white;
     }
 
-    .delete-button:hover {
+    .delete-button:hover:not([disabled]) {
         background-color: #c82333;
     }
 
@@ -326,7 +347,7 @@
         color: white;
     }
 
-    .delete-button-confirm:hover {
+    .delete-button-confirm:hover:not([disabled]) {
         background-color: #c82333;
     }
 
@@ -346,8 +367,8 @@
     const CADDY_ADMIN_ROUTES_URL = 'http://localhost:2019/config/apps/http/servers/srv0/routes';
     const FALLBACK_IP_URL = 'https://ifconfig.me/ip'; // 공인 IP 확인용 API
 
-    // 등록 성공 시 값을 유지하기 위한 변수
     let currentDomain = '';
+    let publicIpAddress = ''; // 공인 IP를 저장할 변수
 
     document.addEventListener('DOMContentLoaded', () => {
         const registerButton = document.getElementById('registerDomainButton');
@@ -390,7 +411,7 @@
         // 모달 닫기 이벤트 리스너
         const handlePostAction = () => {
             messageModal.classList.add('hidden-modal');
-            // 확인 버튼을 누른 후에는 최종 상태를 다시 확인합니다.
+            // '확인' 버튼을 누른 후에는 최종 상태를 다시 확인합니다.
             initializeStatus();
         };
 
@@ -410,30 +431,35 @@
         // ----------------------------------------------------
         const initializeStatus = async () => {
             // 1. 공인 IP 주소 가져오기
-            let publicIp = '';
             try {
                 const ipResponse = await fetch(FALLBACK_IP_URL);
                 if (!ipResponse.ok) throw new Error('IP API 응답 오류');
 
-                publicIp = (await ipResponse.text()).trim();
+                const ipText = (await ipResponse.text()).trim();
 
-                if (publicIp && (publicIp.match(/\./g) || publicIp.match(/:/g))) {
-                    actualIpDisplay.textContent = publicIp;
+                if (ipText && (ipText.match(/\./g) || ipText.match(/:/g))) {
+                    publicIpAddress = ipText; // 전역 변수에 저장
+                    actualIpDisplay.textContent = publicIpAddress;
                 } else {
                     actualIpDisplay.textContent = 'IP 주소 형식 오류';
-                    publicIp = '';
+                    publicIpAddress = '';
                 }
             } catch (error) {
                 console.error("공인 IP 주소를 가져오는 중 오류 발생:", error);
                 actualIpDisplay.innerHTML = 'IP 주소 확인 실패 (<a href="https://www.whatismyip.com/" target="_blank" style="color:#FFEB3B; text-decoration: underline;">외부에서 확인</a>)';
-                publicIp = '';
+                publicIpAddress = '';
             }
 
-            // 2. Caddy Admin API로부터 현재 config를 가져와 상태 업데이트
+            // 2. Caddyfile을 읽어와서 도메인 정보 파싱 (Caddy Admin API가 아닌 Caddyfile의 최종 상태를 기반으로 판단)
+            // Caddy Admin API는 Caddyfile이 적용된 후에만 최신 정보를 주므로,
+            // 등록 성공 후에는 UI를 Caddyfile의 예상 상태로 업데이트하고,
+            // 새로고침 시에는 현재 Caddy Admin API의 상태를 읽어오는 것이 가장 정확합니다.
+
+            // 여기서는 Caddy Admin API의 HTTP 서버에 어떤 라우트가 설정되어 있는지 확인합니다.
             let domainFromCaddy = '';
-            let securityApplied = false;
 
             try {
+                // Caddyfile이 업데이트되고 Caddy가 재로드되었다면, 이 API는 새 설정을 반환해야 합니다.
                 const caddyResponse = await fetch(CADDY_ADMIN_ROUTES_URL);
 
                 if (caddyResponse.ok) {
@@ -444,21 +470,18 @@
 
                         if (hostMatches && hostMatches.host?.length > 0) {
                             const candidate = hostMatches.host[0];
-                            // IP 주소가 아닌, 점(.)을 포함하는 문자열을 도메인으로 간주
-                            if (candidate !== publicIp && candidate.includes('.')) {
+                            // IP 주소(공인 IP)나 포트(:80)가 아닌, 점(.)을 포함하는 문자열을 도메인으로 간주
+                            if (candidate !== publicIpAddress && !candidate.startsWith(':') && candidate.includes('.')) {
                                 domainFromCaddy = candidate;
-                                securityApplied = true;
                                 break;
                             }
                         }
                     }
                 } else {
-                    // Caddy API 응답 실패 (예: Caddy Admin이 실행되지 않았거나 CORS 문제)
-                    console.warn(`Caddy Admin API 응답 오류 (${caddyResponse.status}). Jinja 초기값을 사용합니다.`);
+                    console.warn(`Caddy Admin API 응답 오류 (${caddyResponse.status}). 현재 상태 확인 불가.`);
                 }
             } catch (error) {
-                // Caddy API 연결/파싱 실패 (가장 흔한 CORS 문제)
-                console.warn("Caddy Admin API 연결/파싱 실패. Jinja 초기값을 사용합니다.", error);
+                console.warn("Caddy Admin API 연결 실패. 현재 상태 확인 불가.", error);
             }
 
             // 3. UI에 최종 상태 반영
@@ -466,12 +489,12 @@
             currentDomainDisplay.textContent = domainFromCaddy || '없음';
             domainInput.value = domainFromCaddy || ''; // <-- 도메인 입력 필드에 등록된 도메인 표시
 
-            const statusText = securityApplied ? '적용 (HTTPS)' : '미적용 (HTTP)';
-            const statusClass = securityApplied ? 'status-value-success' : 'status-value-error';
+            const statusText = domainFromCaddy ? '적용 (HTTPS)' : '미적용 (HTTP)';
+            const statusClass = domainFromCaddy ? 'status-value-success' : 'status-value-error';
             updateSecurityStatusUI(statusText, statusClass);
 
             // 도메인이 등록되지 않은 경우 해제 버튼 비활성화
-            releaseButton.disabled = !securityApplied;
+            releaseButton.disabled = !domainFromCaddy;
         };
 
         // 페이지 로드 시 상태 초기화 실행
@@ -494,6 +517,11 @@
                 return;
             }
 
+            if (!publicIpAddress) {
+                showMessage("오류", "공인 IP 주소를 확인할 수 없어 도메인 등록을 진행할 수 없습니다. IP 확인을 시도해주세요.", false);
+                return;
+            }
+
             modalDomainDisplay.textContent = domain;
             registerModal.classList.remove('hidden-modal');
         });
@@ -505,47 +533,42 @@
         confirmRegister.addEventListener('click', async () => {
             registerModal.classList.add('hidden-modal');
             const domain = domainInput.value.trim();
+            const ip = publicIpAddress; // 전역 변수에서 IP 사용
 
             // 1. 상태를 '등록 요청 중'으로 업데이트
             updateSecurityStatusUI('등록 요청 중...', 'status-value-pending');
 
             try {
-                // FastAPI의 도메인 등록 엔드포인트 호출 (서버 측에서 Caddy Admin API를 사용)
+                // FastAPI의 도메인 등록 엔드포인트 호출 (도메인과 IP 주소를 모두 보냄)
                 const response = await fetch(`${BASE_URL}/apply_security`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ domain: domain })
+                    body: JSON.stringify({ domain: domain, ip: ip }) // IP 추가
                 });
 
                 const data = await response.json();
 
                 if (response.ok && data.success) {
-                    // 2. 상태를 'Caddy 설정 완료, 인증서 발급 대기 중'으로 업데이트
-                    updateSecurityStatusUI('인증서 발급 대기 중...', 'status-value-pending');
-
-                    // 클라이언트 측 상태 업데이트 (즉시 반영)
+                    // Caddyfile 업데이트 및 재로드 성공 후: 상태를 '인증서 발급 대기 중'으로 업데이트
+                    // 클라이언트 측 상태 업데이트 (즉시 반영 - 성공했으므로 Caddyfile에 등록된 것으로 간주)
                     currentDomainDisplay.textContent = domain;
                     currentDomain = domain;
                     domainInput.value = domain;
                     releaseButton.disabled = false;
 
-                    showMessage("등록 요청 성공", `✅ ${domain} 도메인이 등록되었습니다.<br>Caddy가 자동 HTTPS 인증서 발급을 시작합니다.`, true);
-                    console.log(`도메인 등록 및 보안 적용 요청 성공: ${data.message}`);
+                    showMessage("등록 요청 성공", `✅ ${domain} 도메인이 등록되었고 Caddy가 재로드되었습니다.<br>인증서 발급이 완료되면 HTTPS가 적용됩니다.`, true);
 
-                    // Caddy의 HTTPS 적용은 비동기로 진행되므로, 최종 상태는 '확인' 버튼을 누른 후 initializeStatus()에서 재확인됩니다.
                 } else {
                     // 실패 시: 상태를 '오류 발생'으로 업데이트 후 원래 상태로 복구 시도
                     showMessage("등록 실패", `❌ 도메인 등록 중 오류가 발생했습니다.<br>${data.message || '서버 응답 오류'}`, false);
                     updateSecurityStatusUI('등록 실패 (HTTP 유지)', 'status-value-error');
-                    console.error("도메인 등록 실패:", data.message);
                 }
             } catch (error) {
                 // 통신 오류 시: 상태를 '통신 오류'로 업데이트 후 원래 상태로 복구 시도
                 showMessage("통신 오류", `❌ 서버와 통신 중 오류 발생: ${error.message}`, false);
                 updateSecurityStatusUI('통신 오류 (HTTP 유지)', 'status-value-error');
-                console.error("Fetch 오류:", error);
             }
         });
 
@@ -555,6 +578,10 @@
         releaseButton.addEventListener('click', () => {
             if (releaseButton.disabled || currentDomainDisplay.textContent.trim() === '없음') {
                 showMessage("알림", "현재 등록된 도메인이 없어 해제가 불가능합니다.", false);
+                return;
+            }
+            if (!publicIpAddress) {
+                showMessage("오류", "공인 IP 주소를 확인할 수 없어 해제(IP 복구)를 진행할 수 없습니다.", false);
                 return;
             }
             releaseModal.classList.remove('hidden-modal');
@@ -568,6 +595,7 @@
             releaseModal.classList.add('hidden-modal');
 
             const domainForRelease = currentDomainDisplay.textContent.trim();
+            const ip = publicIpAddress; // 전역 변수에서 IP 사용
 
             if (domainForRelease === '없음' || !domainForRelease) {
                 showMessage("오류", "해제할 도메인 정보가 유효하지 않습니다.", false);
@@ -577,7 +605,6 @@
             // 1. 상태를 '해제 요청 중'으로 업데이트
             updateSecurityStatusUI('해제 요청 중...', 'status-value-pending');
 
-
             try {
                 // FastAPI의 도메인 해제 엔드포인트 호출
                 const response = await fetch(`${BASE_URL}/release_security`, {
@@ -585,15 +612,14 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    // 해제할 도메인 이름을 백엔드로 보냄
-                    body: JSON.stringify({ current_domain: domainForRelease })
+                    // 해제 시 Caddyfile 복구를 위해 IP 주소를 보냄
+                    body: JSON.stringify({ ip: ip })
                 });
 
                 const data = await response.json();
 
                 if (response.ok && data.success) {
                     // 2. 상태를 '해제 완료'로 업데이트 (HTTP 복구)
-                    updateSecurityStatusUI('해제 완료 (HTTP 복구)', 'status-value-pending');
 
                     // 클라이언트 측 상태 업데이트 (즉시 반영)
                     currentDomainDisplay.textContent = '없음';
@@ -601,21 +627,17 @@
                     domainInput.value = '';
                     releaseButton.disabled = true;
 
-                    showMessage("해제 완료", `✅ 도메인(${domainForRelease})이 해제되었으며,<br>IP (HTTP) 접근으로 변경되었습니다.`, true);
-                    console.log(`도메인 해제 요청 성공: ${data.message}`);
+                    showMessage("해제 완료", `✅ 도메인(${domainForRelease})이 해제되었으며,<br>IP (HTTP) 접근으로 변경되었습니다. Caddy 재로드 완료.`, true);
 
-                    // 최종 상태는 '확인' 버튼을 누른 후 initializeStatus()에서 재확인됩니다.
                 } else {
                     // 실패 시: 상태를 '오류 발생'으로 업데이트 후 원래 상태로 복구 시도
                     showMessage("해제 실패", `❌ 도메인 해제 중 오류가 발생했습니다.<br>${data.message || '서버 응답 오류'}`, false);
-                    updateSecurityStatusUI('해제 실패 (HTTPS 유지)', 'status-value-success');
-                    console.error("도메인 해제 실패:", data.message);
+                    updateSecurityStatusUI('해제 실패 (HTTPS 유지 시도)', 'status-value-success');
                 }
             } catch (error) {
                 // 통신 오류 시: 상태를 '통신 오류'로 업데이트 후 원래 상태로 복구 시도
                 showMessage("통신 오류", `❌ 서버와 통신 중 오류 발생: ${error.message}`, false);
-                updateSecurityStatusUI('통신 오류 (HTTPS 유지)', 'status-value-success');
-                console.error("Fetch 오류:", error);
+                updateSecurityStatusUI('통신 오류 (HTTPS 유지 시도)', 'status-value-success');
             }
         });
 
