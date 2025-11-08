@@ -78,7 +78,7 @@
             <button id="registerDomainButton" class="small-button accent-color-bg full-width-button" disabled>도메인
                 등록</button>
 
-            <button id="releaseDomainButton" class="small-button delete-button full-width-button" disabled>도메인 해제</button>
+            <button id="releaseDomainButton" class="small-button delete-button full-width-button">도메인 해제</button>
         </div>
     </div>
 </div>
@@ -513,7 +513,7 @@
             // 도메인 유효성 검사
             const isDomainValid = domain && domainInput.checkValidity();
 
-            // 둘 다 유효하면 등록 버튼 활성화
+            // 둘 다 유효하면 버튼 활성화
             if (isEmailValid && isDomainValid) {
                 registerButton.disabled = false;
             } else {
@@ -521,39 +521,12 @@
             }
         };
 
-        // 도메인 해제 버튼 상태 업데이트 함수
-        const updateReleaseButtonState = () => {
-            // 현재 도메인이 등록되어 있고 HTTPS 상태일 때만 활성화
-            const hasDomain = currentDomain && currentDomain !== '' && currentDomain !== '없음';
-            const isHttps = securityStatusDisplay.textContent.includes('HTTPS') ||
-                           securityStatusDisplay.textContent.includes('적용');
-
-            // 입력 필드도 확인
-            const hasEmailInput = emailInput.value.trim() !== '';
-            const hasDomainInput = domainInput.value.trim() !== '';
-
-            if (hasDomain && isHttps && hasEmailInput && hasDomainInput) {
-                releaseButton.disabled = false;
-            } else {
-                releaseButton.disabled = true;
-            }
-
-            console.log(`🔍 해제 버튼 상태: 도메인=${currentDomain}, HTTPS=${isHttps}, 이메일입력=${hasEmailInput}, 도메인입력=${hasDomainInput}, 활성화=${!releaseButton.disabled}`);
-        };
-
-        // 입력 필드 변경 시마다 유효성 검사 및 해제 버튼 상태 업데이트
-        emailInput.addEventListener('input', () => {
-            validateInputs();
-            updateReleaseButtonState();
-        });
-        domainInput.addEventListener('input', () => {
-            validateInputs();
-            updateReleaseButtonState();
-        });
+        // 입력 필드 변경 시마다 유효성 검사
+        emailInput.addEventListener('input', validateInputs);
+        domainInput.addEventListener('input', validateInputs);
 
         // 초기 상태 검사
         validateInputs();
-        updateReleaseButtonState();
 
         // ----------------------------------------------------
 
@@ -665,9 +638,6 @@
                                     securityStatusDisplay.classList.remove('status-value-error');
                                     securityStatusDisplay.classList.add('status-value-success');
                                     securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
-
-                                    // 도메인 등록 성공 시 해제 버튼 활성화
-                                    updateReleaseButtonState();
 
                                     showMessage("등록 완료", data.message, true);
                                     console.log(`[성공] ${data.message}`);
@@ -802,9 +772,6 @@
                                     securityStatusDisplay.classList.remove('status-value-success');
                                     securityStatusDisplay.classList.add('status-value-error');
                                     securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
-
-                                    // 도메인 해제 성공 시 해제 버튼 비활성화
-                                    updateReleaseButtonState();
 
                                     showMessage("해제 완료", data.message, true);
                                     console.log(`[성공] ${data.message}`);
