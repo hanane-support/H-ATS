@@ -98,9 +98,6 @@
             <button id="confirmRegisterDomain" class="small-button accent-color-bg">
                 등록
             </button>
-            <button id="cancelRegisterDomain" class="small-button secondary-color-bg">
-                취소
-            </button>
         </div>
     </div>
 </div>
@@ -463,7 +460,6 @@
         const registerButton = document.getElementById('registerDomainButton');
         const registerModal = document.getElementById('registerDomainModal');
         const confirmRegister = document.getElementById('confirmRegisterDomain');
-        const cancelRegister = document.getElementById('cancelRegisterDomain');
         const releaseButton = document.getElementById('releaseDomainButton');
         const releaseModal = document.getElementById('releaseDomainModal');
         const confirmRelease = document.getElementById('confirmReleaseDomain');
@@ -616,10 +612,6 @@
             registerModal.classList.remove('hidden-modal');
         });
 
-        cancelRegister.addEventListener('click', () => {
-            registerModal.classList.add('hidden-modal');
-        });
-
         // ----------------------------------------------------
         // 2. 도메인 등록 확인 및 SSE로 실시간 진행 상황 표시
         // ----------------------------------------------------
@@ -637,9 +629,8 @@
             registerProgressText.textContent = '⏳ 도메인 등록을 시작합니다...';
             registerProgressText.className = 'progress-text'; // 기본 색상 (골드)
 
-            // 버튼 상태 변경: 등록/취소 버튼 비활성화
+            // 버튼 상태 변경: 등록 버튼 비활성화
             confirmRegister.disabled = true;
-            cancelRegister.disabled = true;
 
             try {
                 // POST로 SSE 스트림 요청 (이메일도 함께 전송)
@@ -723,7 +714,6 @@
                                         registerProgressContainer.classList.add('hidden-modal');
                                         confirmRegister.textContent = '등록';
                                         confirmRegister.disabled = false;
-                                        cancelRegister.disabled = false;
                                         // 원래 이벤트 리스너로 복원
                                         confirmRegister.onclick = null;
                                     };
@@ -752,7 +742,6 @@
                                         registerProgressContainer.classList.add('hidden-modal');
                                         confirmRegister.textContent = '등록';
                                         confirmRegister.disabled = false;
-                                        cancelRegister.disabled = false;
                                         // 원래 이벤트 리스너로 복원
                                         confirmRegister.onclick = null;
                                     };
@@ -794,7 +783,6 @@
                     registerProgressContainer.classList.add('hidden-modal');
                     confirmRegister.textContent = '등록';
                     confirmRegister.disabled = false;
-                    cancelRegister.disabled = false;
                     // 원래 이벤트 리스너로 복원
                     confirmRegister.onclick = null;
                 };
