@@ -10,6 +10,7 @@ from my_utilities.my_caddy_api import (
     register_domain_with_progress,
     release_domain_with_progress
 )
+from .my_index import get_server_info
 
 # 템플릿 디렉토리가 'my_templates'에 있다고 가정합니다. (환경에 따라 수정 필요)
 templates = Jinja2Templates(directory="my_templates")
@@ -55,10 +56,14 @@ async def domain_security_manager(request: Request):
         # DB에서 현재 도메인 및 보안 상태를 가져옵니다.
         domain_config = get_domain_security_config(admin_id)
 
+    # 서버 정보 가져오기
+    server_info = get_server_info(request)
+
     context = {
         "request": request,
         "domain_name": domain_config.get("domain_name", "없음"),
-        "security_status": domain_config.get("security_status", "HTTP")
+        "security_status": domain_config.get("security_status", "HTTP"),
+        **server_info  # 서버 정보 추가
     }
 
     return templates.TemplateResponse(

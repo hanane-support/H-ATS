@@ -12,7 +12,7 @@ APP_PORT=8000
 # Supervisor 프로그램 이름을 "server_log"로 지정
 SUPERVISOR_PROGRAM_NAME="server_log"
 DB_FILE_NAME="my_admin_config.db"
-MY_IP="61.85.61.62" # 외부 접근 시 사용할 사용자님의 공인 IP
+HOME_IP="61.85.61.62" # 외부 접근 시 사용할 사용자님의 공인 IP
 
 #==============================================================
 # 2. 시스템 환경 설정 및 필수 도구 설치
@@ -111,17 +111,17 @@ apt install caddy -y
 systemctl daemon-reload
 
 CADDY_CONF="/etc/caddy/Caddyfile"
-echo ">> Caddyfile (${CADDY_CONF}) 생성 및 초기 설정 (Admin API 활성화 및 MY_IP 제한)..."
+echo ">> Caddyfile (${CADDY_CONF}) 생성 및 초기 설정 (Admin API 활성화 및 HOME_IP 제한)..."
 cat <<EOF | sudo tee "$CADDY_CONF" > /dev/null
 # Caddy Admin API를 로컬호스트에 바인딩
 {
     admin 127.0.0.1:2019
 }
 
-# 초기 접근: MY_IP로 접근하는 관리자 콘솔만 허용
+# 초기 접근: HOME_IP로 접근하는 관리자 콘솔만 허용
 :80 {
     @myip {
-        remote_ip $MY_IP
+        remote_ip $HOME_IP
     }
 
     handle @myip {

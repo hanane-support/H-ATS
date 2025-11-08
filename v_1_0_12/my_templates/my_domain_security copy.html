@@ -21,7 +21,7 @@
     <div class="status-box">
         <div class="status-content">
             <p>
-                <span class="status-label">IP :</span>
+                <span class="status-label">HOME IP :</span>
                 <span class="status-value-ip" id="actualIpDisplay">IP 주소 확인 중...</span>
             </p>
 
@@ -44,7 +44,25 @@
         </div>
     </div>
 
-    <h3 class="section-header">도메인 관리</h3>
+    <h3 class="section-header">이메일 등록 <span class="required-mark">(필수)</span></h3>
+
+    <div class="info-box">
+        <p class="info-text">
+            <strong>이메일을 등록해야 하는 이유:</strong>
+        </p>
+        <ul class="info-list">
+            <li>인증서 만료 알림 수신 (30일 전, 7일 전)</li>
+            <li>ACME 계정 복구 및 관리</li>
+            <li>보안 취약점 발견 시 긴급 연락</li>
+        </ul>
+    </div>
+
+    <div>
+        <input type="email" id="email-input" placeholder="admin@example.com" class="email-input"
+            title="유효한 이메일 주소 (예: admin@yourdomain.com)">
+    </div>
+
+    <h3 class="section-header">도메인 관리 <span class="required-mark">(필수)</span></h3>
 
     <div>
         <input type="text" id="domain-input" placeholder="example.com (영문 도메인 권장)" class="domain-input"
@@ -52,7 +70,8 @@
             title="유효한 도메인 형식 (예: example.com, sub.example.co.kr)">
 
         <div class="button-group">
-            <button id="registerDomainButton" class="small-button accent-color-bg full-width-button">도메인 등록</button>
+            <button id="registerDomainButton" class="small-button accent-color-bg full-width-button" disabled>도메인
+                등록</button>
 
             <button id="releaseDomainButton" class="small-button delete-button full-width-button">도메인 해제</button>
         </div>
@@ -252,16 +271,66 @@
     }
 
     .status-value-ip {
-        color: #FFEB3B;
+        color: #fffb00;
         font-size: 1.1em;
     }
 
     .status-value-success {
-        color: #8BC34A;
+        color: #22ff00;
     }
 
     .status-value-error {
         color: #EF5350;
+    }
+
+    .required-mark {
+        color: #EF5350;
+        font-size: 0.9em;
+        font-weight: normal;
+    }
+
+    .info-box {
+        background-color: #1a2332;
+        border: 1px solid #2a3f5f;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+
+    .info-text {
+        color: var(--text-color-light);
+        margin: 0 0 10px 0;
+        font-size: 0.95em;
+    }
+
+    .info-list {
+        color: var(--text-color-dark);
+        margin: 0;
+        padding-left: 20px;
+        font-size: 0.9em;
+        line-height: 1.6;
+    }
+
+    .info-list li {
+        margin-bottom: 5px;
+    }
+
+    .email-input {
+        width: 100%;
+        padding: 12px;
+        margin-top: 0;
+        margin-bottom: 25px;
+        border: 1px solid #444;
+        border-radius: 6px;
+        background-color: var(--sidebar-bg-dark);
+        color: var(--text-color-light);
+        font-size: 1em;
+        box-sizing: border-box;
+    }
+
+    .email-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
     }
 
     .domain-input {
@@ -277,6 +346,11 @@
         box-sizing: border-box;
     }
 
+    .domain-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+    }
+
     .button-group {
         display: flex;
         gap: 10px;
@@ -289,10 +363,15 @@
         border-radius: 4px;
         cursor: pointer;
         /* font-weight: bold; */
-        transition: background-color 0.3s;
+        transition: background-color 0.3s, opacity 0.3s;
         color: var(--text-color-light);
         font-size: 1em;
         flex-grow: 1;
+    }
+
+    .small-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 
     .accent-color-bg {
@@ -354,6 +433,7 @@
         const releaseModal = document.getElementById('releaseDomainModal');
         const confirmRelease = document.getElementById('confirmReleaseDomain');
         const cancelRelease = document.getElementById('cancelReleaseDomain');
+        const emailInput = document.getElementById('email-input');
         const domainInput = document.getElementById('domain-input');
         const modalDomainDisplay = document.getElementById('modal-domain-display');
 
@@ -427,10 +507,52 @@
         fetchPublicIp();
 
         // ----------------------------------------------------
+        // 이메일 및 도메인 유효성 검사 및 버튼 활성화
+        // ----------------------------------------------------
+
+        const validateInputs = () => {
+            const email = emailInput.value.trim();
+            const domain = domainInput.value.trim();
+
+            // 이메일 유효성 검사 (간단한 정규식)
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const isEmailValid = email && emailRegex.test(email);
+
+            // 도메인 유효성 검사
+            const isDomainValid = domain && domainInput.checkValidity();
+
+            // 둘 다 유효하면 버튼 활성화
+            if (isEmailValid && isDomainValid) {
+                registerButton.disabled = false;
+            } else {
+                registerButton.disabled = true;
+            }
+        };
+
+        // 입력 필드 변경 시마다 유효성 검사
+        emailInput.addEventListener('input', validateInputs);
+        domainInput.addEventListener('input', validateInputs);
+
+        // 초기 상태 검사
+        validateInputs();
+
+        // ----------------------------------------------------
 
 
         registerButton.addEventListener('click', () => {
+            const email = emailInput.value.trim();
             const domain = domainInput.value.trim();
+
+            if (!email) {
+                showMessage("오류", "이메일을 먼저 입력해주세요.", false);
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                showMessage("오류", "유효한 이메일 형식이 아닙니다.<br>예: admin@yourdomain.com", false);
+                return;
+            }
 
             if (!domain) {
                 showMessage("오류", "도메인을 먼저 입력해주세요.", false);
@@ -450,61 +572,111 @@
             registerModal.classList.add('hidden-modal');
         });
 
-        // 도메인 등록 성공 후 실행할 클라이언트 측 상태 업데이트 함수
-        const handlePostRegisterAction = () => {
-            messageModal.classList.add('hidden-modal');
-            // 이전에는 여기서 window.location.reload()를 했지만, 이제는 상태가 유지되므로 아무 작업도 하지 않습니다.
-        };
-
         // ----------------------------------------------------
-        // 2. 도메인 등록 확인 및 Caddyfile 실행 로직 (새로고침 제거)
+        // 2. 도메인 등록 확인 및 SSE로 실시간 진행 상황 표시
         // ----------------------------------------------------
         confirmRegister.addEventListener('click', async () => {
             registerModal.classList.add('hidden-modal');
+            const email = emailInput.value.trim();
             const domain = domainInput.value.trim();
 
+            // 서버 상태의 "보안:" 영역을 실시간 진행 상황 표시로 사용
+            securityStatusDisplay.textContent = '⏳ 도메인 등록을 시작합니다...';
+            securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
+            securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+
             try {
-                // Fast API의 보안 적용 엔드포인트 호출
+                // POST로 SSE 스트림 요청 (이메일도 함께 전송)
                 const response = await fetch(`${BASE_URL}/apply_security`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ domain: domain })
+                    body: JSON.stringify({
+                        domain: domain,
+                        email: email
+                    })
                 });
 
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    // Caddyfile 실행 및 HTTPS 적용 성공 시
-
-                    // 1. 상태 업데이트 (새로고침 없이 클라이언트 측에서 즉시 반영)
-                    currentDomainDisplay.textContent = domain;
-                    currentDomain = domain;
-                    domainInput.value = currentDomain;
-
-                    // 보안 상태를 성공(HTTPS)으로 변경
-                    securityStatusDisplay.textContent = '적용 (HTTPS)';
-                    securityStatusDisplay.classList.remove('status-value-error');
-                    securityStatusDisplay.classList.add('status-value-success');
-
-                    // 2. 메시지 표시
-                    showMessage("등록 완료", `✅ ${domain} 도메인이 등록되었으며,<br>SSL/TLS 보안이 적용되었습니다.`, true);
-
-                    // 이제 새로고침은 제거하고, 모달이 닫힐 때 추가적인 액션을 막습니다.
-                    // (handlePostRegisterAction 함수는 현재 아무것도 하지 않습니다.)
-                    closeMessageModal.removeEventListener('click', handlePostRegisterAction);
-                    closeMessageModal.addEventListener('click', handlePostRegisterAction);
-
-                    console.log(`도메인 등록 및 보안 적용 요청 성공: ${data.message}`);
-                } else {
-                    // Caddyfile 실행 또는 서버 활성화 실패 시
-                    showMessage("등록 실패", `❌ 도메인 등록 중 오류가 발생했습니다.<br>${data.message || '서버 응답 오류'}`, false);
-                    console.error("도메인 등록 실패:", data.message);
+                if (!response.ok) {
+                    throw new Error(`서버 응답 오류: ${response.status}`);
                 }
+
+                // SSE 스트림 읽기
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+
+                    // 마지막 불완전한 라인은 버퍼에 보관
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.substring(6).trim();
+                            if (!jsonStr) continue;
+
+                            try {
+                                const data = JSON.parse(jsonStr);
+
+                                // 실시간 진행 상황 업데이트
+                                if (data.status === 'progress') {
+                                    // 서버 상태의 "보안:" 영역에 실시간 진행 상황 표시
+                                    securityStatusDisplay.textContent = `${data.message}`;
+                                    securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
+                                    securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+
+                                    console.log(`[진행 중] ${data.message} (${data.step})`);
+                                } else if (data.status === 'success') {
+                                    // 성공 시 상태 업데이트
+                                    currentDomainDisplay.textContent = domain;
+                                    currentDomain = domain;
+                                    domainInput.value = currentDomain;
+
+                                    securityStatusDisplay.textContent = '적용 (HTTPS)';
+                                    securityStatusDisplay.classList.remove('status-value-error');
+                                    securityStatusDisplay.classList.add('status-value-success');
+                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
+
+                                    showMessage("등록 완료", data.message, true);
+                                    console.log(`[성공] ${data.message}`);
+                                    break;
+                                } else if (data.status === 'error') {
+                                    // 실패 시
+                                    securityStatusDisplay.textContent = '미적용 (HTTP)';
+                                    securityStatusDisplay.classList.remove('status-value-success');
+                                    securityStatusDisplay.classList.add('status-value-error');
+                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
+
+                                    showMessage("등록 실패", data.message, false);
+                                    console.error(`[실패] ${data.message}`);
+                                    break;
+                                } else if (data.status === 'warning') {
+                                    // 경고 메시지
+                                    console.warn(`[경고] ${data.message}`);
+                                }
+                            } catch (parseError) {
+                                console.error("JSON 파싱 오류:", parseError, "원본:", jsonStr);
+                            }
+                        }
+                    }
+                }
+
             } catch (error) {
                 showMessage("통신 오류", `❌ 서버와 통신 중 오류 발생: ${error.message}`, false);
                 console.error("Fetch 오류:", error);
+
+                // 오류 시 상태 복구
+                securityStatusDisplay.textContent = '미적용 (HTTP)';
+                securityStatusDisplay.classList.remove('status-value-success');
+                securityStatusDisplay.classList.add('status-value-error');
+                securityStatusDisplay.style.color = '';
             }
         });
 
@@ -512,6 +684,14 @@
 
 
         releaseButton.addEventListener('click', () => {
+            // 현재 등록된 도메인 확인
+            const registeredDomain = currentDomainDisplay.textContent.trim();
+
+            if (registeredDomain === '없음' || !registeredDomain) {
+                showMessage("오류", "해제할 도메인이 없습니다.<br>먼저 도메인을 등록해주세요.", false);
+                return;
+            }
+
             releaseModal.classList.remove('hidden-modal');
         });
 
@@ -530,7 +710,13 @@
                 return;
             }
 
+            // 서버 상태의 "보안:" 영역을 실시간 진행 상황 표시로 사용
+            securityStatusDisplay.textContent = '⏳ 도메인 해제를 시작합니다...';
+            securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
+            securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+
             try {
+                // POST로 SSE 스트림 요청
                 const response = await fetch(`${BASE_URL}/release_security`, {
                     method: 'POST',
                     headers: {
@@ -539,28 +725,78 @@
                     body: JSON.stringify({ ip: ipAddress })
                 });
 
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    // 상태 업데이트: 도메인 해제 (HTTP로 복귀) - 클라이언트 측에서 즉시 반영
-                    currentDomainDisplay.textContent = '없음';
-                    currentDomain = '';
-                    domainInput.value = '';
-
-                    securityStatusDisplay.textContent = '미적용 (HTTP)';
-                    securityStatusDisplay.classList.remove('status-value-success');
-                    securityStatusDisplay.classList.add('status-value-error');
-
-                    // 메시지 표시
-                    showMessage("해제 완료", `✅ 도메인(${domainForMessage})이 해제되었으며,<br>IP (HTTP) 접근으로 변경되었습니다.`, true);
-                    console.log(`도메인 해제 요청 성공: ${data.message}`);
-                } else {
-                    showMessage("해제 실패", `❌ 도메인 해제 중 오류가 발생했습니다.<br>${data.message || '서버 응답 오류'}`, false);
-                    console.error("도메인 해제 실패:", data.message);
+                if (!response.ok) {
+                    throw new Error(`서버 응답 오류: ${response.status}`);
                 }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+
+                    // 마지막 불완전한 라인은 버퍼에 보관
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.substring(6).trim();
+                            if (!jsonStr) continue;
+
+                            try {
+                                const data = JSON.parse(jsonStr);
+
+                                // 실시간 진행 상황 업데이트
+                                if (data.status === 'progress') {
+                                    // 서버 상태의 "보안:" 영역에 실시간 진행 상황 표시
+                                    securityStatusDisplay.textContent = `${data.message}`;
+                                    securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
+                                    securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+
+                                    console.log(`[진행 중] ${data.message} (${data.step})`);
+                                } else if (data.status === 'success') {
+                                    // 성공 시 상태 업데이트
+                                    currentDomainDisplay.textContent = '없음';
+                                    currentDomain = '';
+                                    domainInput.value = '';
+
+                                    securityStatusDisplay.textContent = '미적용 (HTTP)';
+                                    securityStatusDisplay.classList.remove('status-value-success');
+                                    securityStatusDisplay.classList.add('status-value-error');
+                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
+
+                                    showMessage("해제 완료", data.message, true);
+                                    console.log(`[성공] ${data.message}`);
+                                    break;
+                                } else if (data.status === 'error') {
+                                    // 실패 시
+                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
+
+                                    showMessage("해제 실패", data.message, false);
+                                    console.error(`[실패] ${data.message}`);
+                                    break;
+                                } else if (data.status === 'warning') {
+                                    // 경고 메시지
+                                    console.warn(`[경고] ${data.message}`);
+                                }
+                            } catch (parseError) {
+                                console.error("JSON 파싱 오류:", parseError, "원본:", jsonStr);
+                            }
+                        }
+                    }
+                }
+
             } catch (error) {
                 showMessage("통신 오류", `❌ 서버와 통신 중 오류 발생: ${error.message}`, false);
                 console.error("Fetch 오류:", error);
+
+                // 오류 시 상태 복구
+                securityStatusDisplay.style.color = '';
             }
         });
 

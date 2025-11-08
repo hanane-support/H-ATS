@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ko">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,22 +8,22 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
-        
+
         /* ★ 색상 팔레트 유지 및 조정 */
         :root {
-            --bg-color: #121212; 
-            --text-color: #e0e0e0; 
-            --card-bg: #1a202c; 
-            --info-card-bg: #242933; 
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --card-bg: #1a202c;
+            --info-card-bg: #242933;
             --primary-color: #63b3ed;
-            --secondary-text: #A0AEC0; 
+            --secondary-text: #A0AEC0;
             --shadow-color: rgba(0, 0, 0, 0.8);
-            --status-running: #00c853; 
-            --status-error: #EF4444; 
+            --status-running: #00c853;
+            --status-error: #EF4444;
         }
-        
+
         body {
-            font-family: 'Inter', sans-serif; 
+            font-family: 'Inter', sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -32,44 +33,50 @@
             color: var(--text-color);
             transition: background-color 0.3s, color 0.3s;
         }
+
         .container {
             padding: 30px;
-            border-radius: 16px; 
-            max-width: 450px !important; 
+            border-radius: 16px;
+            max-width: 450px !important;
             width: 90%;
-            
+
             box-shadow: 0 15px 40px var(--shadow-color);
             background-color: var(--card-bg);
-            border: 1px solid rgba(255, 255, 255, 0.05); 
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
+
         h1 {
-            font-weight: 800; 
+            font-weight: 800;
             font-size: 1.8em !important;
             margin-bottom: 0.5em;
             color: var(--primary-color);
             text-align: center;
         }
+
         .header-subtitle {
             text-align: center;
             color: var(--secondary-text);
             font-size: 1em;
             margin-bottom: 2em;
         }
-        
+
         /* 새로운 '그리드' 스타일로 변경 */
         .info-grid {
             display: grid;
             grid-template-columns: 1fr;
             gap: 20px;
-            margin-bottom: 30px; /* 버튼을 위해 하단 마진 추가 */
+            margin-bottom: 30px;
+            /* 버튼을 위해 하단 마진 추가 */
         }
+
         .info-card {
             background-color: var(--info-card-bg);
             padding: 20px;
             border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); 
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
             transition: transform 0.2s;
         }
+
         .info-card h2 {
             font-size: 1em;
             font-weight: 700;
@@ -78,8 +85,9 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
             /* ★ 카드 제목 중앙 정렬 */
-            text-align: center; 
+            text-align: center;
         }
+
         .info-item {
             display: flex;
             justify-content: space-between;
@@ -88,21 +96,23 @@
             border-top: 1px solid rgba(255, 255, 255, 0.05);
             font-size: 1em;
         }
+
         .info-item strong {
-            color: var(--text-color); 
+            color: var(--text-color);
             font-weight: 500;
-            width: auto; 
+            width: auto;
         }
+
         .info-value {
             color: var(--primary-color);
             font-weight: 600;
         }
-        
+
         /* 상태 표시 스타일 */
         .status {
             font-weight: bold;
             padding: 4px 10px;
-            border-radius: 4px; 
+            border-radius: 4px;
             display: inline-block;
             font-size: 0.9em;
             letter-spacing: 0.5px;
@@ -110,21 +120,24 @@
             text-align: center;
             color: #FFFFFF;
         }
+
         .status.running {
             background-color: var(--status-running);
-            color: #FFFFFF !important; 
+            color: #FFFFFF !important;
         }
+
         .status.error {
             background-color: var(--status-error);
-            color: #FFFFFF !important; 
+            color: #FFFFFF !important;
         }
 
         .footer-text {
-            text-align: center; 
-            margin-top: 30px; 
-            color: #9e9e9e; 
+            text-align: center;
+            margin-top: 30px;
+            color: #9e9e9e;
             font-size: 0.8em;
         }
+
         /* ★ 새로운 버튼 스타일 */
         .admin-button {
             display: block;
@@ -137,56 +150,62 @@
             font-size: 1.1em;
             text-decoration: none;
             cursor: pointer;
-            
-            background-color: var(--primary-color); /* 파란색 계열 */
-            color: var(--card-bg); /* 버튼 배경색과 대비되는 어두운 텍스트 */
+
+            background-color: var(--primary-color);
+            /* 파란색 계열 */
+            color: var(--card-bg);
+            /* 버튼 배경색과 대비되는 어두운 텍스트 */
             border: none;
             transition: background-color 0.3s, transform 0.1s;
-            
+
             /* ★ 그림자 변경: 퍼짐(8px)과 투명도(0.3)를 줄여 부드럽게 만듦 */
             box-shadow: 0 4px 8px rgba(99, 179, 237, 0.3);
         }
+
         .admin-button:hover {
-            background-color: #4299e1; /* 약간 더 진한 색 */
+            background-color: #4299e1;
+            /* 약간 더 진한 색 */
             transform: translateY(-1px);
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1><strong>H-ATS INFO</strong></h1>
         <p class="header-subtitle">하나네 자동 매매 서버 정보</p>
-        
+
         <div class="info-grid">
             <div class="info-card">
                 <h2>네트워크 정보</h2>
                 <div class="info-item">
-                    <strong>내 IP 주소</strong>
+                    <strong>HOME IP</strong>
                     <span class="info-value">{{ my_ip }}</span>
                 </div>
                 <div class="info-item">
-                    <strong>서버 IP 주소</strong>
+                    <strong>VULTR IP</strong>
                     <span class="info-value">{{ vultr_ip }}</span>
                 </div>
             </div>
-            
+
             <div class="info-card">
                 <h2>서비스 상태</h2>
                 <div class="info-item">
-                    <strong>FastAPI</strong> 
+                    <strong>FastAPI</strong>
                     <span class="status {% if fastapi_status == 'RUNNING' %}running{% else %}error{% endif %}">
                         {{ fastapi_status }}
                     </span>
                 </div>
                 <div class="info-item">
                     <strong>Caddy</strong>
-                    <span class="status {% if caddy_status == 'active' or caddy_status == 'Active' %}running{% else %}error{% endif %}">
+                    <span
+                        class="status {% if caddy_status == 'active' or caddy_status == 'Active' %}running{% else %}error{% endif %}">
                         {{ caddy_status }}
                     </span>
                 </div>
             </div>
         </div>
-        
+
         <a href="/admin" class="admin-button">
             <strong>H-ATS 관리자 콘솔 시작하기</strong>
         </a>
@@ -195,4 +214,5 @@
         </p>
     </div>
 </body>
+
 </html>

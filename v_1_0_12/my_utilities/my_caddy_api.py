@@ -13,8 +13,8 @@ from typing import Tuple, Dict, Optional, Generator
 # Caddy Admin API 기본 URL
 CADDY_API_URL = "http://127.0.0.1:2019"
 
-# 고정 IP 주소 (내집 IP)
-MY_IP = "61.85.61.62"
+# 고정 IP 주소 (집 IP - HOME에서만 접근 허용)
+HOME_IP = "61.85.61.62"
 
 
 def get_current_config() -> Optional[Dict]:
@@ -108,7 +108,7 @@ def register_domain_with_progress(domain: str, email: str) -> Generator[Dict[str
                                     "@id": "ip_matcher",
                                     "match": [{
                                         "remote_ip": {
-                                            "ranges": [f"{MY_IP}/32"]
+                                            "ranges": [f"{HOME_IP}/32"]
                                         }
                                     }],
                                     "handle": [{
@@ -254,23 +254,106 @@ def register_domain_with_progress(domain: str, email: str) -> Generator[Dict[str
 
 def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], None, None]:
     """
-    도메인을 해제하고 IP만 남기며, 진행 상황을 실시간으로 yield합니다. (SSE용)
+    도메인을 해제하고 HOME IP로 초기화하며, 진행 상황을 실시간으로 yield합니다. (SSE용)
+
+    Caddy Admin API의 DELETE를 사용하여 도메인 라우트와 TLS 설정을 제거합니다.
 
     Args:
-        ip_address: 현재 서버 IP 주소
+        ip_address: 현재 서버 IP 주소 (VULTR IP, 메시지 출력용)
 
     Yields:
         {"status": "progress/success/error", "message": "메시지"} 형식의 딕셔너리
     """
+    print(f"[Caddy API] 🚀 도메인 해제 함수 시작: IP={ip_address}")
     try:
-        # 1단계: 도메인 설정 제거 시작
+        # 1단계: 현재 설정 가져오기
         yield {
             "status": "progress",
-            "message": "⏳ 도메인 설정 제거 중...",
-            "step": "1/3"
+            "message": "⏳ 현재 Caddy 설정 확인 중...",
+            "step": "1/5"
         }
 
-        # IP만 허용하는 설정 (HTTP만)
+        current_config = get_current_config()
+        if not current_config:
+            yield {
+                "status": "error",
+                "message": "❌ Caddy 설정을 가져올 수 없습니다. Caddy가 실행 중인지 확인하세요."
+            }
+            return
+
+        print(f"[Caddy API] ✅ 현재 설정 가져오기 성공")
+        time.sleep(0.5)
+
+        # 2단계: TLS 설정 삭제 (도메인 인증서 제거)
+        yield {
+            "status": "progress",
+            "message": "⏳ SSL/TLS 인증서 설정 제거 중...",
+            "step": "2/5"
+        }
+
+        try:
+            # TLS automation policies 삭제
+            response = requests.delete(f"{CADDY_API_URL}/config/apps/tls/automation/policies")
+            if response.status_code not in [200, 204]:
+                print(f"[Caddy API] ⚠️ TLS 정책 삭제 실패 (무시 가능): {response.status_code}")
+            else:
+                print(f"[Caddy API] ✅ TLS 정책 삭제 성공")
+        except Exception as e:
+            print(f"[Caddy API] ⚠️ TLS 정책 삭제 중 오류 (무시 가능): {e}")
+
+        time.sleep(0.5)
+
+        # 3단계: HTTPS 리스너 제거 (포트 443 비활성화)
+        yield {
+            "status": "progress",
+            "message": "⏳ HTTPS 포트 비활성화 중...",
+            "step": "3/5"
+        }
+
+        # HTTP만 사용하도록 listen 배열 업데이트
+        try:
+            response = requests.patch(
+                f"{CADDY_API_URL}/config/apps/http/servers/srv0/listen",
+                json=[":80"],
+                headers={"Content-Type": "application/json"}
+            )
+            if response.status_code not in [200, 204]:
+                print(f"[Caddy API] ⚠️ HTTPS 포트 비활성화 실패: {response.status_code}")
+            else:
+                print(f"[Caddy API] ✅ HTTPS 포트 비활성화 성공")
+        except Exception as e:
+            print(f"[Caddy API] ⚠️ HTTPS 포트 비활성화 중 오류: {e}")
+
+        time.sleep(0.5)
+
+        # 4단계: 도메인 라우트 삭제 (첫 번째 라우트)
+        yield {
+            "status": "progress",
+            "message": "⏳ 도메인 라우트 제거 중...",
+            "step": "4/5"
+        }
+
+        try:
+            # 첫 번째 라우트(도메인 라우트) 삭제
+            response = requests.delete(f"{CADDY_API_URL}/config/apps/http/servers/srv0/routes/0")
+            if response.status_code not in [200, 204]:
+                print(f"[Caddy API] ⚠️ 도메인 라우트 삭제 실패: {response.status_code} - {response.text}")
+                # 실패해도 계속 진행 (이미 없을 수도 있음)
+            else:
+                print(f"[Caddy API] ✅ 도메인 라우트 삭제 성공")
+        except Exception as e:
+            print(f"[Caddy API] ⚠️ 도메인 라우트 삭제 중 오류: {e}")
+
+        time.sleep(0.5)
+
+        # 5단계: HOME IP 전용 설정으로 초기화
+        yield {
+            "status": "progress",
+            "message": "⏳ HOME IP 전용 설정 적용 중...",
+            "step": "5/5"
+        }
+
+        # HOME IP만 허용하는 최소 설정
         config = {
             "apps": {
                 "http": {
@@ -278,11 +361,11 @@ def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], N
                         "srv0": {
                             "listen": [":80"],
                             "routes": [
-                                # IP 제한 라우트만 유지
+                                # HOME IP 제한 라우트만 유지
                                 {
                                     "match": [{
                                         "remote_ip": {
-                                            "ranges": [f"{MY_IP}/32"]
+                                            "ranges": [f"{HOME_IP}/32"]
                                         }
                                     }],
                                     "handle": [{
@@ -306,15 +389,6 @@ def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], N
             }
         }
 
-        time.sleep(0.5)
-
-        # 2단계: Admin API로 설정 적용
-        yield {
-            "status": "progress",
-            "message": "⏳ HTTP 전용 설정 적용 중...",
-            "step": "2/3"
-        }
-
         response = requests.post(
             f"{CADDY_API_URL}/load",
             json=config,
@@ -322,27 +396,33 @@ def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], N
         )
 
         if response.status_code not in [200, 204]:
+            error_msg = f"❌ HOME IP 설정 적용 실패: {response.text}"
+            print(f"[Caddy API] {error_msg}")
             yield {
                 "status": "error",
-                "message": f"❌ Caddy 설정 적용 실패: {response.text}"
+                "message": error_msg
             }
             return
 
+        print(f"[Caddy API] ✅ HOME IP 전용 설정 적용 성공")
         time.sleep(1)
 
-        # 3단계: 완료
+        # 완료
+        print(f"[Caddy API] ✅ 도메인 해제 완료: VULTR IP={ip_address}, HOME IP={HOME_IP}")
         yield {
             "status": "success",
-            "message": f"✅ 도메인 해제 완료! IP ({ip_address})로 HTTP 접근이 가능합니다.",
-            "step": "3/3",
+            "message": f"✅ 도메인 해제 완료! HOME IP ({HOME_IP})로만 HTTP 접근이 가능합니다.",
+            "step": "5/5",
             "domain_name": "없음",
             "security_status": "HTTP"
         }
 
     except Exception as e:
+        error_msg = f"❌ 오류 발생: {str(e)}"
+        print(f"[Caddy API] {error_msg}")
         yield {
             "status": "error",
-            "message": f"❌ 오류 발생: {str(e)}"
+            "message": error_msg
         }
 
 
