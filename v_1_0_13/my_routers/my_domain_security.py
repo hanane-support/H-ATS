@@ -62,7 +62,6 @@ async def domain_security_manager(request: Request):
     context = {
         "request": request,
         "domain_name": domain_config.get("domain_name", "없음"),
-        "email": domain_config.get("email", ""),
         "security_status": domain_config.get("security_status", "HTTP"),
         **server_info  # 서버 정보 추가
     }
@@ -90,11 +89,9 @@ async def apply_security(request: Request):
         )
 
     domain_to_register = None
-    email_address = None
     try:
         data = await request.json()
         domain_to_register = data.get("domain")
-        email_address = data.get("email")
 
         if not domain_to_register:
             print("❌ 요청 본문에 도메인 정보가 없습니다.")
@@ -103,15 +100,7 @@ async def apply_security(request: Request):
                 content={"success": False, "message": "도메인 정보가 요청 본문에 포함되어 있지 않습니다."}
             )
 
-        if not email_address:
-            print("❌ 요청 본문에 이메일 정보가 없습니다.")
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "message": "이메일 정보가 요청 본문에 포함되어 있지 않습니다."}
-            )
-
         print(f"✅ 클라이언트에서 받은 도메인: {domain_to_register}")
-        print(f"✅ 클라이언트에서 받은 이메일: {email_address}")
         print(f"✅ 관리자 ID: {admin_id}")
     except json.JSONDecodeError:
         print("❌ JSON 디코딩 오류")
@@ -129,19 +118,19 @@ async def apply_security(request: Request):
     # SSE 스트림 생성
     async def event_stream():
         """도메인 등록 진행 상황을 SSE로 스트리밍"""
-        print(f"🚀 도메인 등록 시작: {domain_to_register}, 이메일: {email_address}")
-        for progress in register_domain_with_progress(domain_to_register, email_address):
+        print(f"🚀 도메인 등록 시작: {domain_to_register}")
+        for progress in register_domain_with_progress(domain_to_register):
             print(f"📡 SSE 전송: {progress}")
             yield sse_event(progress)
 
             # 최종 상태일 때 DB 업데이트
             if progress["status"] == "success":
-                print(f"💾 DB 업데이트 시도: admin_id={admin_id}, domain={domain_to_register}, email={email_address}")
+                print(f"💾 DB 업데이트 시도: admin_id={admin_id}, domain={domain_to_register}")
                 db_success = update_domain_security_config(
                     admin_id,
                     domain_to_register,
                     'HTTPS',
-                    email_address
+                    ""  # 이메일 빈 문자열
                 )
                 if not db_success:
                     print("⚠️ DB 업데이트 실패")

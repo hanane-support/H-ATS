@@ -3,18 +3,37 @@ Caddy Admin API를 통한 도메인 및 보안 관리 유틸리티
 
 이 모듈은 Caddy의 Admin API를 사용하여 도메인 등록/해제 및
 SSL/TLS 인증서 상태를 관리합니다.
+
+환경 변수:
+    CADDY_MOCK_MODE: "true"로 설정하면 모의(mock) 테스트 모드로 동작
+                      실제 Caddy API를 호출하지 않고 가상 응답을 생성합니다.
+                      Windows 로컬 테스트에 유용합니다.
 """
 
 import requests
 import time
 import json
+import os
 from typing import Tuple, Dict, Optional, Generator
+
+# 모의(Mock) 테스트 모드 확인
+# Windows 로컬 테스트: set CADDY_MOCK_MODE=true
+# Vultr 프로덕션: 환경 변수 설정 안 함 (기본값 false)
+MOCK_MODE = os.environ.get("CADDY_MOCK_MODE", "false").lower() == "true"
 
 # Caddy Admin API 기본 URL
 CADDY_API_URL = "http://127.0.0.1:2019"
 
 # 고정 IP 주소 (집 IP - HOME에서만 접근 허용)
 HOME_IP = "61.85.61.62"
+
+# 모의 모드 알림
+if MOCK_MODE:
+    print("=" * 60)
+    print("🎭 [CADDY MOCK MODE 활성화]")
+    print("   실제 Caddy API를 호출하지 않습니다.")
+    print("   Windows 로컬 테스트 모드로 동작합니다.")
+    print("=" * 60)
 
 
 def get_current_config() -> Optional[Dict]:
@@ -65,18 +84,26 @@ def check_cert_status(domain: str) -> Tuple[str, str]:
         return "unknown", f"인증서 상태 확인 중 오류 발생: {e}"
 
 
-def register_domain_with_progress(domain: str, email: str) -> Generator[Dict[str, str], None, None]:
+def register_domain_with_progress(domain: str, email: str = "") -> Generator[Dict[str, str], None, None]:
     """
     도메인을 등록하고 진행 상황을 실시간으로 yield합니다. (SSE용)
 
+    환경 변수 CADDY_MOCK_MODE=true로 설정하면 모의 테스트 모드로 동작합니다.
+
     Args:
         domain: 등록할 도메인
-        email: Let's Encrypt 알림용 이메일
+        email: Let's Encrypt 알림용 이메일 (선택사항)
 
     Yields:
         {"status": "progress/success/error", "message": "메시지"} 형식의 딕셔너리
     """
-    print(f"[Caddy API] 🚀 도메인 등록 함수 시작: {domain}, 이메일: {email}")
+    # 모의 모드일 경우 mock 함수 사용
+    if MOCK_MODE:
+        from my_utilities.my_caddy_api_mock import register_domain_with_progress_mock
+        yield from register_domain_with_progress_mock(domain, email)
+        return
+
+    print(f"[Caddy API] 🚀 도메인 등록 함수 시작: {domain}")
     try:
         # 1단계: Caddyfile 업데이트 시작
         print(f"[Caddy API] 📋 1단계: Caddy 설정 생성 중...")
@@ -136,8 +163,7 @@ def register_domain_with_progress(domain: str, email: str) -> Generator[Dict[str
                                 "subjects": [domain],
                                 "issuers": [
                                     {
-                                        "module": "acme",
-                                        "email": email
+                                        "module": "acme"
                                     }
                                 ]
                             }
@@ -256,6 +282,8 @@ def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], N
     """
     도메인을 해제하고 HOME IP로 초기화하며, 진행 상황을 실시간으로 yield합니다. (SSE용)
 
+    환경 변수 CADDY_MOCK_MODE=true로 설정하면 모의 테스트 모드로 동작합니다.
+
     Caddy Admin API의 DELETE를 사용하여 도메인 라우트와 TLS 설정을 제거합니다.
 
     Args:
@@ -264,6 +292,12 @@ def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], N
     Yields:
         {"status": "progress/success/error", "message": "메시지"} 형식의 딕셔너리
     """
+    # 모의 모드일 경우 mock 함수 사용
+    if MOCK_MODE:
+        from my_utilities.my_caddy_api_mock import release_domain_with_progress_mock
+        yield from release_domain_with_progress_mock(ip_address)
+        return
+
     print(f"[Caddy API] 🚀 도메인 해제 함수 시작: IP={ip_address}")
     try:
         # 1단계: 현재 설정 가져오기

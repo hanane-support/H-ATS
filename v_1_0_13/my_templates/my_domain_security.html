@@ -22,12 +22,21 @@
         <div class="status-content">
             <p>
                 <span class="status-label">HOME IP :</span>
-                <span class="status-value-ip" id="actualIpDisplay">IP 주소 확인 중...</span>
+                <span class="status-value-ip">{{ my_ip }}</span>
+            </p>
+
+            <p>
+                <span class="status-label">VULTR IP :</span>
+                <span class="status-value-ip">{{ vultr_ip }}</span>
             </p>
 
             <p>
                 <span class="status-label">도메인 :</span>
                 <span class="status-value" id="currentDomainDisplay">{{ domain_name | default('없음') }}</span>
+                <button id="domainAccessButton" class="domain-access-button" style="display: none;"
+                    data-tooltip="IP 접속에서 로그아웃하고 도메인으로 접속합니다.&#10;다시 로그인 해야 합니다.">
+                    도메인 접속
+                </button>
             </p>
 
             <p>
@@ -44,24 +53,6 @@
         </div>
     </div>
 
-    <h3 class="section-header">이메일 등록 <span class="required-mark">(필수)</span></h3>
-
-    <div class="info-box">
-        <p class="info-text">
-            <strong>이메일을 등록해야 하는 이유:</strong>
-        </p>
-        <ul class="info-list">
-            <li>인증서 만료 알림 수신 (30일 전, 7일 전)</li>
-            <li>ACME 계정 복구 및 관리</li>
-            <li>보안 취약점 발견 시 긴급 연락</li>
-        </ul>
-    </div>
-
-    <div>
-        <input type="email" id="email-input" placeholder="admin@example.com" class="email-input"
-            title="유효한 이메일 주소 (예: admin@yourdomain.com)">
-    </div>
-
     <h3 class="section-header">도메인 관리 <span class="required-mark">(필수)</span></h3>
 
     <div>
@@ -73,7 +64,8 @@
             <button id="registerDomainButton" class="small-button accent-color-bg full-width-button" disabled>도메인
                 등록</button>
 
-            <button id="releaseDomainButton" class="small-button delete-button full-width-button">도메인 해제</button>
+            <button id="releaseDomainButton" class="small-button delete-button full-width-button" disabled>도메인
+                해제</button>
         </div>
     </div>
 </div>
@@ -81,10 +73,14 @@
 <div id="registerDomainModal" class="modal-overlay hidden-modal">
     <div class="modal-content">
         <h3 class="modal-header-danger">도메인 등록 확인</h3>
-        <p class="modal-text">
+        <p class="modal-text" id="registerModalText">
             (<span id="modal-domain-display"></span>) 을 도메인으로 등록합니다. <br><br>
             <span class="modal-text-success">등록 후 SSL/TLS 보안 적용이 시작됩니다.</span>
         </p>
+        <!-- 실시간 진행 상황 표시 영역 (처음에는 숨김) -->
+        <div id="registerProgressContainer" class="progress-container hidden-modal">
+            <p id="registerProgressText" class="progress-text"></p>
+        </div>
         <div class="modal-actions">
             <button id="confirmRegisterDomain" class="small-button accent-color-bg">
                 등록
@@ -99,12 +95,15 @@
 <div id="releaseDomainModal" class="modal-overlay hidden-modal">
     <div class="modal-content">
         <h3 class="modal-header-danger">도메인 해제 확인</h3>
-        <p class="modal-text">
+        <p class="modal-text" id="releaseModalText">
             도메인을 해제하고 IP (HTTP) 로 사용합니다. <br>
+            <br>
+            <span class="modal-text-danger">보안이 취약해질 수 있습니다.</span>
         </p>
-        <p class="modal-text-danger">
-            보안이 취약해질 수 있습니다.
-        </p>
+        <!-- 실시간 진행 상황 표시 영역 (처음에는 숨김) -->
+        <div id="releaseProgressContainer" class="progress-container hidden-modal">
+            <p id="releaseProgressText" class="progress-text"></p>
+        </div>
         <div class="modal-actions">
             <button id="confirmReleaseDomain" class="small-button delete-button-confirm">
                 해제
@@ -248,7 +247,7 @@
 
     .status-box {
         margin-top: 0;
-        padding: 20px;
+        padding: 15px;
         border: 1px solid var(--border-color-dark);
         border-radius: 8px;
         background-color: var(--sidebar-bg-dark);
@@ -256,7 +255,7 @@
 
     .status-content p {
         margin: 12px 0;
-        line-height: 1.2;
+        line-height: 1.1;
     }
 
     .status-label {
@@ -289,9 +288,60 @@
         font-weight: normal;
     }
 
+    /* 도메인 접속 버튼 */
+    .domain-access-button {
+        margin-left: 5px;
+        padding: 6px 6px;
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.8em;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        position: relative;
+        vertical-align: middle;
+        line-height: 1.0;
+        margin-top: -5px;
+    }
+
+    .domain-access-button:hover {
+        background-color: #0056b3;
+    }
+
+    .domain-access-button:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: -80px;
+        background-color: #2a3f5f;
+        color: var(--text-color-light);
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-size: 0.85em;
+        white-space: pre;
+        text-align: center;
+        z-index: 1000;
+        border: 1px solid var(--border-color-dark);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        line-height: 1.5;
+    }
+
+    .domain-access-button:hover::before {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-bottom-color: #2a3f5f;
+        z-index: 1001;
+    }
+
     .info-box {
-        background-color: #1a2332;
-        border: 1px solid #2a3f5f;
+        background-color: var(--sidebar-bg-dark);
+        border: 1px solid var(--border-color-dark);
         border-radius: 6px;
         padding: 15px;
         margin-bottom: 15px;
@@ -313,24 +363,6 @@
 
     .info-list li {
         margin-bottom: 5px;
-    }
-
-    .email-input {
-        width: 100%;
-        padding: 12px;
-        margin-top: 0;
-        margin-bottom: 25px;
-        border: 1px solid #444;
-        border-radius: 6px;
-        background-color: var(--sidebar-bg-dark);
-        color: var(--text-color-light);
-        font-size: 1em;
-        box-sizing: border-box;
-    }
-
-    .email-input:focus {
-        outline: none;
-        border-color: var(--accent-color);
     }
 
     .domain-input {
@@ -413,6 +445,31 @@
         padding: 10px 20px;
         border-radius: 6px;
     }
+
+    .progress-container {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: var(--sidebar-bg-dark);
+        border: 1px solid var(--border-color-dark);
+        border-radius: 6px;
+    }
+
+    .progress-text {
+        color: #FFD700;
+        margin: 0;
+        font-size: 1em;
+        line-height: 1.6;
+        text-align: center;
+    }
+
+    .progress-text.success {
+        color: #22ff00;
+    }
+
+    .progress-text.error {
+        color: #EF5350;
+    }
 </style>
 {% endblock %}
 
@@ -433,14 +490,17 @@
         const releaseModal = document.getElementById('releaseDomainModal');
         const confirmRelease = document.getElementById('confirmReleaseDomain');
         const cancelRelease = document.getElementById('cancelReleaseDomain');
-        const emailInput = document.getElementById('email-input');
         const domainInput = document.getElementById('domain-input');
         const modalDomainDisplay = document.getElementById('modal-domain-display');
 
         // 상태 표시 업데이트를 위한 요소
-        const actualIpDisplay = document.getElementById('actualIpDisplay');
         const currentDomainDisplay = document.getElementById('currentDomainDisplay');
         const securityStatusDisplay = document.getElementById('securityStatusDisplay');
+        const domainAccessButton = document.getElementById('domainAccessButton');
+
+        // VULTR IP 요소 가져오기 (서버에서 전달받은 값)
+        const vultrIpElements = document.querySelectorAll('.status-value-ip');
+        const vultrIpDisplay = vultrIpElements.length >= 2 ? vultrIpElements[1] : null;
 
         // 커스텀 메시지 모달 요소
         const messageModal = document.getElementById('messageModal');
@@ -478,81 +538,105 @@
             currentDomain = initialDomainText;
             domainInput.value = currentDomain;
         }
-        // ----------------------------------------------------
 
         // ----------------------------------------------------
-        // 1. 공인 IP 주소를 비동기적으로 가져와 표시하는 로직
+        // 도메인 접속 버튼 표시/숨김 및 이벤트
         // ----------------------------------------------------
-        const fetchPublicIp = async () => {
-            try {
-                // 통신 오류 문제를 해결하기 위해 텍스트 기반 API로 변경 유지
-                const response = await fetch('https://ifconfig.me/ip');
-                if (!response.ok) {
-                    throw new Error(`IP API 응답 오류: ${response.status}`);
-                }
 
-                const ip = (await response.text()).trim();
+        const updateDomainAccessButton = () => {
+            const hasDomain = currentDomain && currentDomain !== '' && currentDomain !== '없음';
+            const isHttps = securityStatusDisplay.textContent.includes('HTTPS') ||
+                securityStatusDisplay.textContent.includes('적용');
 
-                if (ip && (ip.match(/\./g) || ip.match(/:/g))) {
-                    actualIpDisplay.textContent = ip;
-                } else {
-                    actualIpDisplay.textContent = 'IP 주소 형식 오류';
-                }
-            } catch (error) {
-                console.error("공인 IP 주소를 가져오는 중 오류 발생:", error);
-                actualIpDisplay.innerHTML = 'IP 주소 확인 실패 (<a href="https://www.whatismyip.com/" target="_blank" style="color:#FFEB3B; text-decoration: underline;">외부에서 확인</a>)';
+            if (hasDomain && isHttps) {
+                domainAccessButton.style.display = 'inline-block';
+            } else {
+                domainAccessButton.style.display = 'none';
             }
         };
 
-        fetchPublicIp();
+        // 초기 버튼 상태 업데이트
+        updateDomainAccessButton();
+
+        // 도메인 접속 버튼 클릭 이벤트
+        domainAccessButton.addEventListener('click', async () => {
+            const domain = currentDomain;
+            if (!domain || domain === '없음') {
+                showMessage("오류", "등록된 도메인이 없습니다.", false);
+                return;
+            }
+
+            // 로그아웃 처리
+            try {
+                await fetch('/logout', { method: 'POST' });
+
+                // 도메인으로 리다이렉트 (로그인 페이지)
+                const domainUrl = `https://${domain}/login`;
+                window.location.href = domainUrl;
+            } catch (error) {
+                console.error('로그아웃 오류:', error);
+                // 로그아웃 실패해도 도메인으로 이동
+                const domainUrl = `https://${domain}/login`;
+                window.location.href = domainUrl;
+            }
+        });
 
         // ----------------------------------------------------
-        // 이메일 및 도메인 유효성 검사 및 버튼 활성화
+
+        // VULTR IP는 서버에서 렌더링되므로 별도의 fetch가 필요하지 않습니다.
+
+        // ----------------------------------------------------
+        // 도메인 유효성 검사 및 버튼 활성화
         // ----------------------------------------------------
 
         const validateInputs = () => {
-            const email = emailInput.value.trim();
             const domain = domainInput.value.trim();
-
-            // 이메일 유효성 검사 (간단한 정규식)
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            const isEmailValid = email && emailRegex.test(email);
 
             // 도메인 유효성 검사
             const isDomainValid = domain && domainInput.checkValidity();
 
-            // 둘 다 유효하면 버튼 활성화
-            if (isEmailValid && isDomainValid) {
+            // 도메인 유효하면 등록 버튼 활성화
+            if (isDomainValid) {
                 registerButton.disabled = false;
             } else {
                 registerButton.disabled = true;
             }
         };
 
-        // 입력 필드 변경 시마다 유효성 검사
-        emailInput.addEventListener('input', validateInputs);
-        domainInput.addEventListener('input', validateInputs);
+        // 도메인 해제 버튼 상태 업데이트 함수
+        const updateReleaseButtonState = () => {
+            // 현재 도메인이 등록되어 있고 HTTPS 상태일 때만 활성화
+            const hasDomain = currentDomain && currentDomain !== '' && currentDomain !== '없음';
+            const isHttps = securityStatusDisplay.textContent.includes('HTTPS') ||
+                securityStatusDisplay.textContent.includes('적용');
+
+            // 입력 필드도 확인
+            const hasDomainInput = domainInput.value.trim() !== '';
+
+            if (hasDomain && isHttps && hasDomainInput) {
+                releaseButton.disabled = false;
+            } else {
+                releaseButton.disabled = true;
+            }
+
+            console.log(`🔍 해제 버튼 상태: 도메인=${currentDomain}, HTTPS=${isHttps}, 도메인입력=${hasDomainInput}, 활성화=${!releaseButton.disabled}`);
+        };
+
+        // 입력 필드 변경 시마다 유효성 검사 및 해제 버튼 상태 업데이트
+        domainInput.addEventListener('input', () => {
+            validateInputs();
+            updateReleaseButtonState();
+        });
 
         // 초기 상태 검사
         validateInputs();
+        updateReleaseButtonState();
 
         // ----------------------------------------------------
 
 
         registerButton.addEventListener('click', () => {
-            const email = emailInput.value.trim();
             const domain = domainInput.value.trim();
-
-            if (!email) {
-                showMessage("오류", "이메일을 먼저 입력해주세요.", false);
-                return;
-            }
-
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(email)) {
-                showMessage("오류", "유효한 이메일 형식이 아닙니다.<br>예: admin@yourdomain.com", false);
-                return;
-            }
 
             if (!domain) {
                 showMessage("오류", "도메인을 먼저 입력해주세요.", false);
@@ -568,33 +652,47 @@
             registerModal.classList.remove('hidden-modal');
         });
 
-        cancelRegister.addEventListener('click', () => {
-            registerModal.classList.add('hidden-modal');
-        });
-
         // ----------------------------------------------------
         // 2. 도메인 등록 확인 및 SSE로 실시간 진행 상황 표시
         // ----------------------------------------------------
+
+        // 등록 진행 중인지 확인하는 플래그
+        let isRegistering = false;
+
         confirmRegister.addEventListener('click', async () => {
-            registerModal.classList.add('hidden-modal');
-            const email = emailInput.value.trim();
+            // 이미 등록 진행 중이면 리턴 (중복 실행 방지)
+            if (isRegistering) {
+                console.log('이미 등록이 진행 중입니다.');
+                return;
+            }
+
             const domain = domainInput.value.trim();
 
-            // 서버 상태의 "보안:" 영역을 실시간 진행 상황 표시로 사용
-            securityStatusDisplay.textContent = '⏳ 도메인 등록을 시작합니다...';
-            securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
-            securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+            // 모달 UI 업데이트: 확인 텍스트 숨기고 진행 상황 표시 영역 보이기
+            const registerModalText = document.getElementById('registerModalText');
+            const registerProgressContainer = document.getElementById('registerProgressContainer');
+            const registerProgressText = document.getElementById('registerProgressText');
+
+            registerModalText.classList.add('hidden-modal');
+            registerProgressContainer.classList.remove('hidden-modal');
+            registerProgressText.textContent = '⏳ 도메인 등록을 시작합니다...';
+            registerProgressText.className = 'progress-text'; // 기본 색상 (골드)
+
+            // 버튼 상태 변경: 등록 버튼 비활성화
+            confirmRegister.disabled = true;
+
+            // 등록 진행 플래그 설정
+            isRegistering = true;
 
             try {
-                // POST로 SSE 스트림 요청 (이메일도 함께 전송)
+                // POST로 SSE 스트림 요청 (도메인만 전송)
                 const response = await fetch(`${BASE_URL}/apply_security`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        domain: domain,
-                        email: email
+                        domain: domain
                     })
                 });
 
@@ -627,10 +725,9 @@
 
                                 // 실시간 진행 상황 업데이트
                                 if (data.status === 'progress') {
-                                    // 서버 상태의 "보안:" 영역에 실시간 진행 상황 표시
-                                    securityStatusDisplay.textContent = `${data.message}`;
-                                    securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
-                                    securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+                                    // 모달 내 진행 상황 표시
+                                    registerProgressText.textContent = `${data.message}`;
+                                    registerProgressText.className = 'progress-text'; // 골드 색상
 
                                     console.log(`[진행 중] ${data.message} (${data.step})`);
                                 } else if (data.status === 'success') {
@@ -639,22 +736,52 @@
                                     currentDomain = domain;
                                     domainInput.value = currentDomain;
 
+                                    // 서버 상태는 최종 결과만 표시
                                     securityStatusDisplay.textContent = '적용 (HTTPS)';
                                     securityStatusDisplay.classList.remove('status-value-error');
                                     securityStatusDisplay.classList.add('status-value-success');
-                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
 
-                                    showMessage("등록 완료", data.message, true);
+                                    // 모달에 성공 메시지 표시
+                                    registerProgressText.textContent = '도메인 등록이 완료되었습니다.';
+                                    registerProgressText.className = 'progress-text success'; // 녹색
+
+                                    // 도메인 등록 성공 시 해제 버튼 활성화
+                                    updateReleaseButtonState();
+
+                                    // 도메인 접속 버튼 표시
+                                    updateDomainAccessButton();
+
+                                    // 확인 버튼 활성화 (파란색)
+                                    confirmRegister.textContent = '확인';
+                                    confirmRegister.disabled = false;
+                                    confirmRegister.classList.remove('accent-color-bg');
+                                    confirmRegister.classList.add('accent-color-bg');
+
+                                    // 등록 완료 - 플래그 해제 및 다음 클릭 시 모달 닫기 준비
+                                    isRegistering = false;
+
                                     console.log(`[성공] ${data.message}`);
                                     break;
                                 } else if (data.status === 'error') {
-                                    // 실패 시
+                                    // 실패 시 - 입력 필드 값 유지 (currentDomain, currentEmail 업데이트 안 함)
                                     securityStatusDisplay.textContent = '미적용 (HTTP)';
                                     securityStatusDisplay.classList.remove('status-value-success');
                                     securityStatusDisplay.classList.add('status-value-error');
-                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
 
-                                    showMessage("등록 실패", data.message, false);
+                                    // 모달에 실패 메시지 표시
+                                    registerProgressText.textContent = `등록 실패: ${data.message}`;
+                                    registerProgressText.className = 'progress-text error'; // 빨간색
+
+                                    // 입력 필드는 사용자가 입력한 값 그대로 유지
+                                    // (domainInput.value 변경 안 함)
+
+                                    // 확인 버튼 활성화
+                                    confirmRegister.textContent = '확인';
+                                    confirmRegister.disabled = false;
+
+                                    // 등록 실패 - 플래그 해제 및 다음 클릭 시 모달 닫기 준비
+                                    isRegistering = false;
+
                                     console.error(`[실패] ${data.message}`);
                                     break;
                                 } else if (data.status === 'warning') {
@@ -669,15 +796,65 @@
                 }
 
             } catch (error) {
-                showMessage("통신 오류", `❌ 서버와 통신 중 오류 발생: ${error.message}`, false);
+                // 모달에 오류 메시지 표시
+                registerProgressText.textContent = `❌ 서버와 통신 중 오류 발생: ${error.message}`;
+                registerProgressText.className = 'progress-text error';
+
                 console.error("Fetch 오류:", error);
 
                 // 오류 시 상태 복구
                 securityStatusDisplay.textContent = '미적용 (HTTP)';
                 securityStatusDisplay.classList.remove('status-value-success');
                 securityStatusDisplay.classList.add('status-value-error');
-                securityStatusDisplay.style.color = '';
+
+                // 입력 필드는 사용자가 입력한 값 그대로 유지
+                // (domainInput.value 변경 안 함)
+
+                // 확인 버튼 활성화
+                confirmRegister.textContent = '확인';
+                confirmRegister.disabled = false;
+
+                // 통신 오류 - 플래그 해제 및 다음 클릭 시 모달 닫기 준비
+                isRegistering = false;
             }
+        });
+
+        // 성공/실패 후 '확인' 버튼 클릭 시 모달 닫기 처리를 위한 별도 리스너
+        confirmRegister.addEventListener('click', (event) => {
+            // 등록이 완료되었고, 버튼 텍스트가 '확인'일 때만 모달 닫기
+            if (!isRegistering && confirmRegister.textContent === '확인') {
+                // 이벤트 전파 중지 (중요!)
+                event.stopImmediatePropagation();
+
+                // 모달 닫고 초기화
+                registerModal.classList.add('hidden-modal');
+                registerModalText.classList.remove('hidden-modal');
+                registerProgressContainer.classList.add('hidden-modal');
+                confirmRegister.textContent = '등록';
+                confirmRegister.disabled = false;
+
+                console.log('모달 닫기 완료');
+            }
+        }, true); // 캡처 단계에서 실행
+
+        // ----------------------------------------------------
+        // 도메인 등록 취소 버튼
+        // ----------------------------------------------------
+
+        cancelRegister.addEventListener('click', () => {
+            // 모달 닫고 초기화
+            registerModal.classList.add('hidden-modal');
+
+            // 진행 중이었다면 초기화
+            const registerModalText = document.getElementById('registerModalText');
+            const registerProgressContainer = document.getElementById('registerProgressContainer');
+
+            registerModalText.classList.remove('hidden-modal');
+            registerProgressContainer.classList.add('hidden-modal');
+            confirmRegister.textContent = '등록';
+            confirmRegister.disabled = false;
+
+            console.log('등록 모달 취소됨');
         });
 
         // ----------------------------------------------------
@@ -695,25 +872,41 @@
             releaseModal.classList.remove('hidden-modal');
         });
 
-        cancelRelease.addEventListener('click', () => {
-            releaseModal.classList.add('hidden-modal');
-        });
+        // 해제 진행 중인지 확인하는 플래그
+        let isReleasing = false;
 
         confirmRelease.addEventListener('click', async () => {
-            releaseModal.classList.add('hidden-modal');
+            // 이미 해제 진행 중이면 리턴 (중복 실행 방지)
+            if (isReleasing) {
+                console.log('이미 해제가 진행 중입니다.');
+                return;
+            }
 
-            const domainForMessage = currentDomainDisplay.textContent.trim();
-            const ipAddress = actualIpDisplay.textContent.trim(); // IP 주소 가져오기
+            // VULTR IP 가져오기
+            const ipAddress = vultrIpDisplay ? vultrIpDisplay.textContent.trim() : '{{ vultr_ip }}';
 
-            if (!ipAddress || ipAddress === 'IP 주소 확인 중...' || ipAddress === 'IP 주소 형식 오류') {
+            if (!ipAddress || ipAddress === '확인 중...' || ipAddress === '') {
                 showMessage("오류", "유효한 IP 주소를 가져올 수 없습니다. 페이지를 새로고침하거나 잠시 후 다시 시도해주세요.", false);
                 return;
             }
 
-            // 서버 상태의 "보안:" 영역을 실시간 진행 상황 표시로 사용
-            securityStatusDisplay.textContent = '⏳ 도메인 해제를 시작합니다...';
-            securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
-            securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+            console.log(`🔍 도메인 해제 요청: VULTR IP = ${ipAddress}`);
+
+            // 모달 UI 업데이트: 확인 텍스트 숨기고 진행 상황 표시 영역 보이기
+            const releaseModalText = document.getElementById('releaseModalText');
+            const releaseProgressContainer = document.getElementById('releaseProgressContainer');
+            const releaseProgressText = document.getElementById('releaseProgressText');
+
+            releaseModalText.classList.add('hidden-modal');
+            releaseProgressContainer.classList.remove('hidden-modal');
+            releaseProgressText.textContent = '⏳ 도메인 해제를 시작합니다...';
+            releaseProgressText.className = 'progress-text'; // 기본 색상 (골드)
+
+            // 버튼 상태 변경: 해제 버튼 비활성화
+            confirmRelease.disabled = true;
+
+            // 해제 진행 플래그 설정
+            isReleasing = true;
 
             try {
                 // POST로 SSE 스트림 요청
@@ -753,10 +946,9 @@
 
                                 // 실시간 진행 상황 업데이트
                                 if (data.status === 'progress') {
-                                    // 서버 상태의 "보안:" 영역에 실시간 진행 상황 표시
-                                    securityStatusDisplay.textContent = `${data.message}`;
-                                    securityStatusDisplay.classList.remove('status-value-error', 'status-value-success');
-                                    securityStatusDisplay.style.color = '#FFD700'; // 골드 색상
+                                    // 모달 내 진행 상황 표시
+                                    releaseProgressText.textContent = `${data.message}`;
+                                    releaseProgressText.className = 'progress-text'; // 골드 색상
 
                                     console.log(`[진행 중] ${data.message} (${data.step})`);
                                 } else if (data.status === 'success') {
@@ -765,19 +957,45 @@
                                     currentDomain = '';
                                     domainInput.value = '';
 
+                                    // 서버 상태는 최종 결과만 표시
                                     securityStatusDisplay.textContent = '미적용 (HTTP)';
                                     securityStatusDisplay.classList.remove('status-value-success');
                                     securityStatusDisplay.classList.add('status-value-error');
-                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
 
-                                    showMessage("해제 완료", data.message, true);
+                                    // 모달에 성공 메시지 표시
+                                    releaseProgressText.textContent = '도메인 해제가 완료되었습니다.';
+                                    releaseProgressText.className = 'progress-text success'; // 녹색
+
+                                    // 도메인 해제 성공 시 해제 버튼 비활성화
+                                    updateReleaseButtonState();
+
+                                    // 도메인 접속 버튼 숨김
+                                    updateDomainAccessButton();
+
+                                    // 확인 버튼 활성화 (파란색)
+                                    confirmRelease.textContent = '확인';
+                                    confirmRelease.disabled = false;
+                                    confirmRelease.classList.remove('delete-button-confirm');
+                                    confirmRelease.classList.add('accent-color-bg');
+
+                                    // 해제 완료 - 플래그 해제 및 다음 클릭 시 모달 닫기 준비
+                                    isReleasing = false;
+
                                     console.log(`[성공] ${data.message}`);
                                     break;
                                 } else if (data.status === 'error') {
                                     // 실패 시
-                                    securityStatusDisplay.style.color = ''; // 기본 색상으로 복구
+                                    // 모달에 실패 메시지 표시
+                                    releaseProgressText.textContent = `해제 실패: ${data.message}`;
+                                    releaseProgressText.className = 'progress-text error'; // 빨간색
 
-                                    showMessage("해제 실패", data.message, false);
+                                    // 확인 버튼 활성화
+                                    confirmRelease.textContent = '확인';
+                                    confirmRelease.disabled = false;
+
+                                    // 해제 실패 - 플래그 해제 및 다음 클릭 시 모달 닫기 준비
+                                    isReleasing = false;
+
                                     console.error(`[실패] ${data.message}`);
                                     break;
                                 } else if (data.status === 'warning') {
@@ -792,13 +1010,64 @@
                 }
 
             } catch (error) {
-                showMessage("통신 오류", `❌ 서버와 통신 중 오류 발생: ${error.message}`, false);
+                // 모달에 오류 메시지 표시
+                releaseProgressText.textContent = `❌ 서버와 통신 중 오류 발생: ${error.message}`;
+                releaseProgressText.className = 'progress-text error';
+
                 console.error("Fetch 오류:", error);
 
-                // 오류 시 상태 복구
-                securityStatusDisplay.style.color = '';
+                // 확인 버튼 활성화
+                confirmRelease.textContent = '확인';
+                confirmRelease.disabled = false;
+
+                // 통신 오류 - 플래그 해제 및 다음 클릭 시 모달 닫기 준비
+                isReleasing = false;
             }
         });
+
+        // 성공/실패 후 '확인' 버튼 클릭 시 모달 닫기 처리를 위한 별도 리스너
+        confirmRelease.addEventListener('click', (event) => {
+            // 해제가 완료되었고, 버튼 텍스트가 '확인'일 때만 모달 닫기
+            if (!isReleasing && confirmRelease.textContent === '확인') {
+                // 이벤트 전파 중지 (중요!)
+                event.stopImmediatePropagation();
+
+                // 모달 닫고 초기화
+                releaseModal.classList.add('hidden-modal');
+                releaseModalText.classList.remove('hidden-modal');
+                releaseProgressContainer.classList.add('hidden-modal');
+                confirmRelease.textContent = '해제';
+                confirmRelease.disabled = false;
+                confirmRelease.classList.remove('accent-color-bg');
+                confirmRelease.classList.add('delete-button-confirm');
+
+                console.log('해제 모달 닫기 완료');
+            }
+        }, true); // 캡처 단계에서 실행
+
+        // ----------------------------------------------------
+        // 도메인 해제 취소 버튼
+        // ----------------------------------------------------
+
+        cancelRelease.addEventListener('click', () => {
+            // 모달 닫고 초기화
+            releaseModal.classList.add('hidden-modal');
+
+            // 진행 중이었다면 초기화
+            const releaseModalText = document.getElementById('releaseModalText');
+            const releaseProgressContainer = document.getElementById('releaseProgressContainer');
+
+            releaseModalText.classList.remove('hidden-modal');
+            releaseProgressContainer.classList.add('hidden-modal');
+            confirmRelease.textContent = '해제';
+            confirmRelease.disabled = false;
+            confirmRelease.classList.remove('accent-color-bg');
+            confirmRelease.classList.add('delete-button-confirm');
+
+            console.log('해제 모달 취소됨');
+        });
+
+        // ----------------------------------------------------
 
         console.log("도메인 및 보안 관리 페이지 로드됨.");
     });

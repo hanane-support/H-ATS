@@ -6,7 +6,7 @@
 
 GITHUB_REPO_URL="https://github.com/hanane-support/H-ATS.git"
 PROJECT_ROOT_DIR="/H-ATS"
-APP_SUB_DIR="v_1_0_12"
+APP_SUB_DIR="v_1_0_13"
 APP_MODULE="my_main:app"
 APP_PORT=8000
 # Supervisor 프로그램 이름을 "server_log"로 지정
