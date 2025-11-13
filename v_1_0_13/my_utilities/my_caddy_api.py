@@ -70,17 +70,26 @@ def check_cert_status(domain: str) -> Tuple[str, str]:
         response = requests.get(f"{CADDY_API_URL}/config/apps/tls/certificates")
         if response.status_code == 200:
             certs = response.json()
+            print(f"[Caddy API] 인증서 개수: {len(certs)}")
 
             # 인증서 목록에서 도메인 찾기
             for cert_info in certs:
-                if isinstance(cert_info, dict) and 'subjects' in cert_info:
-                    if domain in cert_info.get('subjects', []):
+                print(f"[Caddy API] 인증서 정보: {cert_info}")
+                if isinstance(cert_info, dict):
+                    # subjects 필드 확인
+                    subjects = cert_info.get('subjects', [])
+                    print(f"[Caddy API] subjects: {subjects}")
+                    if domain in subjects:
+                        print(f"[Caddy API] ✅ 도메인 {domain} 인증서 발견!")
                         return "active", f"✅ {domain}에 대한 SSL/TLS 인증서가 활성화되었습니다."
 
+            print(f"[Caddy API] ⏳ 도메인 {domain}의 인증서를 찾지 못함")
             return "pending", f"⏳ {domain}에 대한 인증서 발급이 진행 중입니다..."
         else:
+            print(f"[Caddy API] ❌ 인증서 상태 확인 실패: {response.status_code}")
             return "unknown", "인증서 상태를 확인할 수 없습니다."
     except Exception as e:
+        print(f"[Caddy API] ❌ 인증서 상태 확인 중 예외 발생: {e}")
         return "unknown", f"인증서 상태 확인 중 오류 발생: {e}"
 
 
@@ -236,12 +245,12 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
         # 4단계: Let's Encrypt 인증서 검증 중 (최대 30초 대기)
         yield {
             "status": "progress",
-            "message": "⏳ Let's Encrypt 인증서 검증 중 (최대 10초 소요)...",
+            "message": "⏳ Let's Encrypt 인증서 검증 중 (최대 30초 소요)...",
             "step": "4/5"
         }
 
-        # 인증서 발급 완료 대기 (최대 10초)
-        max_wait_time = 10
+        # 인증서 발급 완료 대기 (최대 30초)
+        max_wait_time = 30
         check_interval = 2
         elapsed_time = 0
 
