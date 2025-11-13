@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+jinja2
+python-multipart
+requests
+supervisor
+bcrypt
+python-jose
+starlette-session

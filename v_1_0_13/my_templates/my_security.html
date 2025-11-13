@@ -1,0 +1,1673 @@
+{% extends "my_base.html" %}
+
+{% block title %}보안 - H-ATS Admin{% endblock %}
+
+{% block page_header %}보안{% endblock %}
+
+{% block content %}
+
+<!-- 도메인 카드 -->
+<div class="card security-card">
+    <h2 class="card-title">도메인</h2>
+    <p class="security-description-text">
+        <span class="security-text-span">
+            HTTP 는 데이터를 암호화하지 않고 전송하지만, HTTPS 는 SSL/TLS 로 데이터를 암호화해 보안을 강화합니다.
+            <br>HTTPS 보안을 적용하기 위해 도메인 등록을 권장합니다.
+        </span>
+    </p>
+    <hr class="card-hr">
+
+    <h3 class="section-header">도메인</h3>
+
+    <div>
+        <input type="text" id="domain-input" placeholder="example.com (영문 도메인 권장)" class="domain-input"
+            pattern="^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$"
+            title="유효한 도메인 형식 (예: example.com, sub.example.co.kr)">
+
+        <div class="button-group">
+            <button id="registerDomainButton" class="small-button accent-color-bg full-width-button" disabled>도메인
+                등록</button>
+
+            <button id="releaseDomainButton" class="small-button delete-button full-width-button" disabled>도메인
+                해제</button>
+        </div>
+    </div>
+
+    <!-- 도메인 및 보안 상태 -->
+    <div class="status-box" style="margin-top: 20px;">
+        <div class="status-content">
+            <p>
+                <span class="status-label">도메인 :</span>
+                <span class="status-value" id="currentDomainDisplay">{{ domain_name | default('없음') }}</span>
+                <button id="domainAccessButton" class="domain-access-button" style="display: none;"
+                    data-tooltip="IP 접속에서 로그아웃하고 도메인으로 접속합니다.&#10;다시 로그인 해야 합니다.">
+                    도메인 접속
+                </button>
+            </p>
+
+            <p>
+                <span class="status-label">보안 :</span>
+                <span id="securityStatusDisplay"
+                    class="{% if security_status == 'HTTPS' %}status-value-success{% else %}status-value-error{% endif %}">
+                    {% if security_status == 'HTTPS' %}
+                    적용 (HTTPS)
+                    {% else %}
+                    미적용 (HTTP)
+                    {% endif %}
+                </span>
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- 접근 허용 IP 카드 -->
+<div class="card ip-card">
+    <h2 class="card-title">접근 허용 IP</h2>
+    <p class="security-description-text">
+        <span class="security-text-span">
+            웹훅 요청을 허용할 IP 주소를 설정합니다. 트레이딩뷰의 기본 IP가 미리 설정되어 있습니다.
+        </span>
+    </p>
+    <hr class="card-hr">
+
+    <h3 class="section-header">
+        접근 허용 IP
+        <span class="info-tooltip-icon"
+            data-tooltip="트레이딩뷰 기본 IP&#10;52.89.214.238&#10;34.212.75.30&#10;54.218.53.128&#10;52.32.178.7">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" />
+                <path d="M12 16V12" stroke="white" stroke-width="2" stroke-linecap="round" />
+                <circle cx="12" cy="8" r="1" fill="white" />
+            </svg>
+        </span>
+    </h3>
+
+    <div>
+        <textarea id="allowed-ips-input" placeholder="IP 주소를 쉼표로 구분하여 입력하세요" class="webhook-input"
+            rows="3">{{ allowed_ips }}</textarea>
+
+        <div class="button-group">
+            <button id="registerIpsButton" class="small-button accent-color-bg full-width-button">접근 허용 IP 등록</button>
+            <button id="releaseIpsButton" class="small-button delete-button full-width-button" {% if not allowed_ips or
+                allowed_ips==default_allowed_ips %}disabled{% endif %}>접근 허용 IP
+                해제</button>
+        </div>
+    </div>
+</div>
+
+<!-- 트레이딩뷰 카드 -->
+<div class="card webhook-card">
+    <h2 class="card-title">트레이딩뷰</h2>
+    <p class="security-description-text">
+        <span class="security-text-span">
+            주문 정보를 받을 웹훅 주소와 관리자 인증을 위한 패스워드를 설정합니다.
+        </span>
+    </p>
+    <hr class="card-hr">
+
+    <h3 class="section-header">웹훅 주소</h3>
+
+    <div>
+        <input type="text" id="webhook-endpoint-input" placeholder="예: webhook" class="webhook-input"
+            value="{{ webhook_endpoint.lstrip('/') if webhook_endpoint else 'webhook' }}">
+
+        <div class="button-group">
+            <button id="registerEndpointButton" class="small-button accent-color-bg full-width-button">웹훅 주소 등록</button>
+            <button id="releaseEndpointButton" class="small-button delete-button full-width-button" {% if not
+                webhook_endpoint or webhook_endpoint=='/webhook' %}disabled{% endif %}>웹훅 주소 해제</button>
+        </div>
+    </div>
+
+    <!-- 웹훅 주소 풀 표시 -->
+    <div class="status-box" style="margin-top: 15px;">
+        <div class="status-content">
+            <p style="margin: 0;">
+                <span class="status-label">웹훅 URL :</span>
+                <span class="status-value-url" id="webhookFullUrl">{% if domain_name and domain_name != '없음' %}http://{{
+                    domain_name }}{{ webhook_endpoint }}{% else %}http://{{ server_ip }}{{ webhook_endpoint }}{% endif
+                    %}</span>
+                <button id="copyWebhookUrlButton" class="copy-button" data-tooltip="클릭하여 웹훅 URL 복사">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2" />
+                        <path
+                            d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5"
+                            stroke="currentColor" stroke-width="2" />
+                    </svg>
+                </button>
+            </p>
+        </div>
+    </div>
+
+    <h3 class="section-header">
+        웹훅 패스워드
+        <span class="info-tooltip-icon"
+            data-tooltip="• 최소 길이: 4자 이상&#10;• 문자 조합: 제한 없음&#10;&#10;✅ 숫자만: 1234&#10;✅ 영문만: ABCD 또는 abcd&#10;✅ 영문+숫자: abc123&#10;✅ 특수문자: abc@123!&#10;✅ 한글: 한글패스워드&#10;✅ 공백: 중간 공백 가능">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" />
+                <path d="M12 16V12" stroke="white" stroke-width="2" stroke-linecap="round" />
+                <circle cx="12" cy="8" r="1" fill="white" />
+            </svg>
+        </span>
+    </h3>
+
+    <div>
+        <div style="position: relative; margin-bottom: 25px;">
+            <input type="password" id="webhook-password-input" placeholder="최소 4자 이상" class="webhook-input"
+                value="{{ webhook_password }}" style="padding-right: 40px; margin-bottom: 0;">
+            <button type="button" class="password-toggle-btn" data-target="webhook-password-input"
+                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; color: #9ca3af; opacity: 0.7; transition: opacity 0.3s;"
+                onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" />
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+                </svg>
+                <svg class="eye-slash-icon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                    xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2" />
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2" />
+                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" />
+                </svg>
+            </button>
+        </div>
+
+        <div class="button-group">
+            <button id="registerWebhookButton" class="small-button accent-color-bg full-width-button">웹훅 패스워드
+                등록</button>
+            <button id="releaseWebhookButton" class="small-button delete-button full-width-button" {% if not
+                webhook_password %}disabled{% endif %}>웹훅 패스워드 해제</button>
+        </div>
+    </div>
+
+    <div class="info-box">
+        <h4 class="info-header">트레이딩뷰 얼러트 메세지 입력 방법</h4>
+        <p class="info-text">
+            얼러트 메시지 입력란에 붙여넣기 합니다.
+        </p>
+        <div class="code-block-container">
+            <button id="copyJsonButton" class="copy-json-icon-button" data-tooltip="JSON 복사">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2" />
+                    <path d="M5 15H4C2.89543 15 2 14.1046 2 13V4C2 2.89543 2.89543 2 4 2H13C14.1046 2 15 2.89543 15 4V5"
+                        stroke="currentColor" stroke-width="2" />
+                </svg>
+            </button>
+            <pre class="code-block" id="tradingviewJson">{
+  "admin_id": "{{ user_id }}",
+  "webhook_password": "{{ webhook_password if webhook_password else '여기에_위에서_설정한_패스워드' }}",
+  "id": "{% raw %}{{strategy.order.id}}{% endraw %}",
+  "comment": "{% raw %}{{strategy.order.comment}}{% endraw %}",
+  "exchange": "{% raw %}{{exchange}}{% endraw %}",
+  "ticker": "{% raw %}{{ticker}}{% endraw %}",
+  "basecurrency": "{% raw %}{{syminfo.basecurrency}}{% endraw %}",
+  "currency": "{% raw %}{{syminfo.currency}}{% endraw %}",
+  "prev_market_position": "{% raw %}{{strategy.prev_market_position}}{% endraw %}",
+  "action": "{% raw %}{{strategy.order.action}}{% endraw %}",
+  "market_position": "{% raw %}{{strategy.market_position}}{% endraw %}",
+  "price": "{% raw %}{{strategy.order.price}}{% endraw %}",
+  "contracts": "{% raw %}{{strategy.order.contracts}}{% endraw %}"
+}</pre>
+        </div>
+    </div>
+</div>
+
+<!-- 도메인 등록 확인 모달 -->
+<div id="registerDomainModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-success">도메인 등록 확인</h3>
+        <p class="modal-text" id="registerModalText">
+            (<span id="modal-domain-display"></span>) 을 도메인으로 등록합니다. <br><br>
+            <span class="modal-text-success">등록 후 SSL/TLS 보안 적용이 시작됩니다.</span>
+        </p>
+        <!-- 실시간 진행 상황 표시 영역 (처음에는 숨김) -->
+        <div id="registerProgressContainer" class="progress-container hidden-modal">
+            <p id="registerProgressText" class="progress-text"></p>
+        </div>
+        <div class="modal-actions">
+            <button id="confirmRegisterDomain" class="small-button accent-color-bg">
+                등록
+            </button>
+            <button id="cancelRegisterDomain" class="small-button secondary-color-bg">
+                취소
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 도메인 해제 확인 모달 -->
+<div id="releaseDomainModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-danger">도메인 해제 확인</h3>
+        <p class="modal-text" id="releaseModalText">
+            도메인을 해제하고 IP (HTTP) 로 사용합니다. <br>
+            <br>
+            <span class="modal-text-danger">보안이 취약해질 수 있습니다.</span>
+        </p>
+        <!-- 실시간 진행 상황 표시 영역 (처음에는 숨김) -->
+        <div id="releaseProgressContainer" class="progress-container hidden-modal">
+            <p id="releaseProgressText" class="progress-text"></p>
+        </div>
+        <div class="modal-actions">
+            <button id="confirmReleaseDomain" class="small-button delete-button-confirm">
+                해제
+            </button>
+            <button id="cancelReleaseDomain" class="small-button secondary-color-bg">
+                취소
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 웹훅 주소 등록 확인 모달 -->
+<div id="registerEndpointModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-success">웹훅 주소 등록 확인</h3>
+        <p class="modal-text">
+            웹훅 주소를 등록합니다.<br><br>
+            <span class="modal-text-success">트레이딩뷰 웹훅 URL에 이 주소가 포함됩니다.</span>
+        </p>
+        <div class="modal-actions">
+            <button id="confirmRegisterEndpoint" class="small-button accent-color-bg">등록</button>
+            <button id="cancelRegisterEndpoint" class="small-button secondary-color-bg">취소</button>
+        </div>
+    </div>
+</div>
+
+<!-- 웹훅 주소 해제 확인 모달 -->
+<div id="releaseEndpointModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-danger">웹훅 주소 해제 확인</h3>
+        <p class="modal-text">
+            웹훅 주소를 기본값(/webhook)으로 초기화합니다.<br><br>
+            <span class="modal-text-danger">기존 설정된 웹훅 주소가 삭제됩니다.</span>
+        </p>
+        <div class="modal-actions">
+            <button id="confirmReleaseEndpoint" class="small-button delete-button-confirm">해제</button>
+            <button id="cancelReleaseEndpoint" class="small-button secondary-color-bg">취소</button>
+        </div>
+    </div>
+</div>
+
+<!-- 웹훅 패스워드 등록 확인 모달 -->
+<div id="registerWebhookModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-success">웹훅 패스워드 등록 확인</h3>
+        <p class="modal-text">
+            웹훅 패스워드를 등록합니다.<br><br>
+            <span class="modal-text-success">트레이딩뷰 알림 메시지에 이 패스워드를 포함해야 합니다.</span>
+        </p>
+        <div class="modal-actions">
+            <button id="confirmRegisterWebhook" class="small-button accent-color-bg">등록</button>
+            <button id="cancelRegisterWebhook" class="small-button secondary-color-bg">취소</button>
+        </div>
+    </div>
+</div>
+
+<!-- 웹훅 패스워드 해제 확인 모달 -->
+<div id="releaseWebhookModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-danger">웹훅 패스워드 해제 확인</h3>
+        <p class="modal-text">
+            웹훅 패스워드를 해제합니다.<br><br>
+            <span class="modal-text-danger">더 이상 트레이딩뷰에서 주문을 받을 수 없습니다.</span>
+        </p>
+        <div class="modal-actions">
+            <button id="confirmReleaseWebhook" class="small-button delete-button-confirm">해제</button>
+            <button id="cancelReleaseWebhook" class="small-button secondary-color-bg">취소</button>
+        </div>
+    </div>
+</div>
+
+<!-- 메시지 모달 -->
+<div id="messageModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 id="messageModalHeader" class="modal-header-success"></h3>
+        <p id="messageModalText" class="modal-text"></p>
+        <div class="modal-actions">
+            <button id="closeMessageModal" class="small-button secondary-color-bg">확인</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_head_styles %}
+<style>
+    .card {
+        background-color: var(--header-bg-dark);
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--border-color-dark);
+        margin-bottom: 30px;
+    }
+
+    .webhook-card {
+        margin-bottom: 0;
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .hidden-modal {
+        display: none !important;
+    }
+
+    .modal-content {
+        background-color: var(--header-bg-dark);
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        border: 1px solid var(--border-color-dark);
+        max-width: 500px;
+        width: 90%;
+        text-align: center;
+    }
+
+    .modal-header-success {
+        color: #8BC34A;
+        font-size: 1.5em;
+        margin-bottom: 30px;
+        margin-top: 0;
+    }
+
+    .modal-header-danger {
+        color: #ff4d4d;
+        font-size: 1.5em;
+        margin-bottom: 30px;
+        margin-top: 0;
+    }
+
+    .modal-text {
+        color: var(--text-color-light);
+        margin-bottom: 15px;
+        line-height: 1.4;
+        font-size: 1em;
+    }
+
+    .modal-text-success {
+        color: #83ff52;
+    }
+
+    .modal-text-danger {
+        color: #ff4d4d;
+        margin-bottom: 25px;
+        font-size: 1em;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 30px;
+    }
+
+    .card-title {
+        color: var(--subtitle-color);
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 1.5em;
+    }
+
+    .security-description-text {
+        color: var(--text-color-light);
+        margin-top: 5px;
+        margin-bottom: 15px;
+        line-height: 1.4;
+    }
+
+    .card-hr {
+        border: 0;
+        height: 1px;
+        background-color: var(--border-color-dark);
+        margin-top: 20px;
+        margin-bottom: 30px;
+    }
+
+    .section-header {
+        color: var(--text-color-light);
+        margin-top: 35px;
+        margin-bottom: 10px;
+        font-size: 1.2em;
+    }
+
+    .webhook-input {
+        width: 100%;
+        padding: 12px;
+        margin-top: 0;
+        margin-bottom: 25px;
+        border: 1px solid #444;
+        border-radius: 6px;
+        background-color: var(--sidebar-bg-dark);
+        color: var(--text-color-light);
+        font-size: 1em;
+        box-sizing: border-box;
+    }
+
+    .webhook-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+    }
+
+    .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 0px;
+        margin-bottom: 30px;
+    }
+
+    .small-button {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s, opacity 0.3s;
+        color: var(--text-color-light);
+        font-size: 1em;
+        flex-grow: 1;
+    }
+
+    .small-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .accent-color-bg {
+        background-color: var(--accent-color);
+    }
+
+    .accent-color-bg:hover:not(:disabled) {
+        background-color: #0056b3;
+    }
+
+    .secondary-color-bg {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .secondary-color-bg:hover {
+        background-color: #5a6268;
+    }
+
+    .delete-button {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .delete-button:hover:not(:disabled) {
+        background-color: #c82333;
+    }
+
+    .delete-button-confirm {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .delete-button-confirm:hover {
+        background-color: #c82333;
+    }
+
+    .full-width-button {
+        padding: 10px 20px;
+        border-radius: 6px;
+    }
+
+    /* 안내 박스 */
+    .info-box {
+        background-color: var(--sidebar-bg-dark);
+        padding: 20px;
+        border-radius: 6px;
+        border: 1px solid #444;
+        margin-top: 30px;
+    }
+
+    .info-header {
+        color: var(--subtitle-color);
+        margin-top: 0;
+        margin-bottom: 15px;
+        font-size: 1.1em;
+    }
+
+    .info-text {
+        color: var(--text-color-light);
+        margin-bottom: 10px;
+        line-height: 1.4;
+    }
+
+    .code-block {
+        background-color: #1a1a1a;
+        color: #ffffff;
+        padding: 15px;
+        border-radius: 4px;
+        border: 1px solid #333;
+        overflow-x: auto;
+        font-family: 'Courier New', monospace;
+        font-size: 0.9em;
+        line-height: 1.5;
+        margin: 10px 0;
+    }
+
+    /* 서버 상태 박스 */
+    .status-box {
+        margin-top: 0;
+        padding: 15px;
+        border: 1px solid var(--border-color-dark);
+        border-radius: 8px;
+        background-color: var(--sidebar-bg-dark);
+    }
+
+    .status-content p {
+        margin: 12px 0;
+        line-height: 1.1;
+    }
+
+    .status-label {
+        color: var(--text-color-light);
+        display: inline-block;
+        width: 80px;
+    }
+
+    .status-value {
+        color: var(--text-color-dark);
+    }
+
+    .status-value-ip {
+        color: #fffb00;
+        font-size: 1.1em;
+    }
+
+    .status-value-success {
+        color: #22ff00;
+    }
+
+    .status-value-error {
+        color: #EF5350;
+    }
+
+    .required-mark {
+        color: #EF5350;
+        font-size: 0.9em;
+        font-weight: normal;
+    }
+
+    /* 도메인 입력 */
+    .domain-input {
+        width: 100%;
+        padding: 12px;
+        margin-top: 0;
+        margin-bottom: 25px;
+        border: 1px solid #444;
+        border-radius: 6px;
+        background-color: var(--sidebar-bg-dark);
+        color: var(--text-color-light);
+        font-size: 1em;
+        box-sizing: border-box;
+    }
+
+    .domain-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+    }
+
+    /* 도메인 접속 버튼 */
+    .domain-access-button {
+        margin-left: 5px;
+        padding: 6px 6px;
+        background-color: var(--accent-color);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        font-size: 0.8em;
+        cursor: pointer;
+        transition: background-color 0.3s;
+        position: relative;
+        vertical-align: middle;
+        line-height: 1.0;
+        margin-top: -4px;
+    }
+
+    .domain-access-button:hover {
+        background-color: #0056b3;
+    }
+
+    .domain-access-button:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: -80px;
+        background-color: #2a3f5f;
+        color: var(--text-color-light);
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-size: 1.1em;
+        white-space: pre;
+        text-align: center;
+        z-index: 1000;
+        border: 1px solid var(--border-color-dark);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        line-height: 1.5;
+    }
+
+    .domain-access-button:hover::before {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-bottom-color: #2a3f5f;
+        z-index: 1001;
+    }
+
+    /* 진행 상황 표시 */
+    .progress-container {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        padding: 15px;
+        background-color: var(--sidebar-bg-dark);
+        border: 1px solid var(--border-color-dark);
+        border-radius: 6px;
+    }
+
+    .progress-text {
+        color: #f2ff00;
+        margin: 0;
+        font-size: 1em;
+        line-height: 1.6;
+        text-align: center;
+    }
+
+    .progress-text.success {
+        color: #22ff00;
+    }
+
+    .progress-text.error {
+        color: #EF5350;
+    }
+
+    #releaseDomainModal .modal-header-danger {
+        color: #ff4d4d;
+    }
+
+    /* 복사 버튼 스타일 */
+    .copy-button {
+        margin-left: 10px;
+        padding: 6px 8px;
+        background-color: transparent;
+        color: var(--text-color-light);
+        border: 1px solid var(--text-color-light);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+        vertical-align: middle;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .copy-button:hover {
+        background-color: var(--accent-color);
+        border-color: var(--accent-color);
+        color: white;
+    }
+
+    .copy-button svg {
+        display: block;
+    }
+
+    .code-block-container {
+        position: relative;
+    }
+
+    .copy-json-icon-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 6px 8px;
+        background-color: rgba(255, 255, 255, 0.1);
+        color: var(--text-color-light);
+        border: 1px solid var(--text-color-light);
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10;
+    }
+
+    .copy-json-icon-button:hover {
+        background-color: var(--accent-color);
+        border-color: var(--accent-color);
+        color: white;
+    }
+
+    .copy-json-icon-button svg {
+        display: block;
+    }
+
+    .status-value-url {
+        color: #f2ff00;
+        font-size: 0.95em;
+        word-break: break-all;
+    }
+
+    textarea.webhook-input {
+        resize: vertical;
+        font-family: 'Courier New', monospace;
+    }
+
+    /* 툴팁 아이콘 스타일 */
+    .info-tooltip-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 8px;
+        cursor: help;
+        position: relative;
+        vertical-align: -3px;
+    }
+
+    .info-tooltip-icon svg {
+        display: block;
+    }
+
+    .info-tooltip-icon:hover::after {
+        content: attr(data-tooltip);
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 30px;
+        background-color: #2a3f5f;
+        color: var(--text-color-light);
+        padding: 12px 15px;
+        border-radius: 6px;
+        font-size: 0.8em;
+        white-space: pre-line;
+        text-align: left;
+        z-index: 1000;
+        border: 1px solid var(--border-color-dark);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        line-height: 1.6;
+        min-width: 280px;
+        font-weight: normal;
+    }
+
+    .info-tooltip-icon:hover::before {
+        content: '';
+        position: absolute;
+        top: 22px;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-bottom-color: #2a3f5f;
+        z-index: 1001;
+    }
+</style>
+{% endblock %}
+
+{% block page_script %}
+<script>
+    const BASE_URL = '/admin/security';
+    const DOMAIN_BASE_URL = '/admin/domain';
+
+    // 등록 성공 시 값을 유지하기 위한 변수
+    let currentDomain = '';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // ===== 도메인 관리 요소 =====
+        const registerDomainButton = document.getElementById('registerDomainButton');
+        const registerDomainModal = document.getElementById('registerDomainModal');
+        const confirmRegisterDomain = document.getElementById('confirmRegisterDomain');
+        const cancelRegisterDomain = document.getElementById('cancelRegisterDomain');
+
+        const releaseDomainButton = document.getElementById('releaseDomainButton');
+        const releaseDomainModal = document.getElementById('releaseDomainModal');
+        const confirmReleaseDomain = document.getElementById('confirmReleaseDomain');
+        const cancelReleaseDomain = document.getElementById('cancelReleaseDomain');
+
+        const domainInput = document.getElementById('domain-input');
+        const modalDomainDisplay = document.getElementById('modal-domain-display');
+
+        // 상태 표시 업데이트를 위한 요소
+        const currentDomainDisplay = document.getElementById('currentDomainDisplay');
+        const securityStatusDisplay = document.getElementById('securityStatusDisplay');
+        const domainAccessButton = document.getElementById('domainAccessButton');
+
+        // VULTR IP 요소 가져오기
+        const vultrIpElements = document.querySelectorAll('.status-value-ip');
+        const vultrIpDisplay = vultrIpElements.length >= 2 ? vultrIpElements[1] : null;
+
+        // ===== 웹훅 관리 요소 =====
+        const registerButton = document.getElementById('registerWebhookButton');
+        const registerModal = document.getElementById('registerWebhookModal');
+        const confirmRegister = document.getElementById('confirmRegisterWebhook');
+        const cancelRegister = document.getElementById('cancelRegisterWebhook');
+
+        const releaseButton = document.getElementById('releaseWebhookButton');
+        const releaseModal = document.getElementById('releaseWebhookModal');
+        const confirmRelease = document.getElementById('confirmReleaseWebhook');
+        const cancelRelease = document.getElementById('cancelReleaseWebhook');
+
+        const webhookInput = document.getElementById('webhook-password-input');
+
+        const messageModal = document.getElementById('messageModal');
+        const messageModalHeader = document.getElementById('messageModalHeader');
+        const messageModalText = document.getElementById('messageModalText');
+        const closeMessageModal = document.getElementById('closeMessageModal');
+
+        // 메시지 모달 표시 함수
+        const showMessage = (header, text, isSuccess = true) => {
+            messageModalHeader.textContent = header;
+            messageModalText.innerHTML = text;
+
+            messageModalHeader.classList.remove('modal-header-danger', 'modal-header-success');
+            if (isSuccess) {
+                messageModalHeader.classList.add('modal-header-success');
+            } else {
+                messageModalHeader.classList.add('modal-header-danger');
+            }
+
+            messageModal.classList.remove('hidden-modal');
+        };
+
+        // 모달 닫기
+        closeMessageModal.addEventListener('click', () => {
+            messageModal.classList.add('hidden-modal');
+        });
+
+        // ====================================================
+        // 도메인 관리 로직
+        // ====================================================
+
+        // 초기 상태 동기화
+        const initialDomainText = currentDomainDisplay.textContent.trim();
+        if (initialDomainText !== '없음' && initialDomainText !== '') {
+            currentDomain = initialDomainText;
+            domainInput.value = currentDomain;
+        }
+
+        // 도메인 접속 버튼 표시/숨김
+        const updateDomainAccessButton = () => {
+            const hasDomain = currentDomain && currentDomain !== '' && currentDomain !== '없음';
+            const isHttps = securityStatusDisplay.textContent.includes('HTTPS') ||
+                securityStatusDisplay.textContent.includes('적용');
+
+            if (hasDomain && isHttps) {
+                domainAccessButton.style.display = 'inline-block';
+            } else {
+                domainAccessButton.style.display = 'none';
+            }
+        };
+
+        updateDomainAccessButton();
+
+        // 도메인 접속 버튼 클릭
+        domainAccessButton.addEventListener('click', async () => {
+            const domain = currentDomain;
+            if (!domain || domain === '없음') {
+                showMessage("오류", "등록된 도메인이 없습니다.", false);
+                return;
+            }
+
+            try {
+                await fetch('/logout', { method: 'POST' });
+                const domainUrl = `https://${domain}/login`;
+                window.location.href = domainUrl;
+            } catch (error) {
+                console.error('로그아웃 오류:', error);
+                const domainUrl = `https://${domain}/login`;
+                window.location.href = domainUrl;
+            }
+        });
+
+        // 도메인 유효성 검사
+        const validateDomainInputs = () => {
+            const domain = domainInput.value.trim();
+            const isDomainValid = domain && domainInput.checkValidity();
+
+            if (isDomainValid) {
+                registerDomainButton.disabled = false;
+            } else {
+                registerDomainButton.disabled = true;
+            }
+        };
+
+        // 도메인 해제 버튼 상태 업데이트
+        const updateReleaseButtonState = () => {
+            const hasDomain = currentDomain && currentDomain !== '' && currentDomain !== '없음';
+            const isHttps = securityStatusDisplay.textContent.includes('HTTPS') ||
+                securityStatusDisplay.textContent.includes('적용');
+            const hasDomainInput = domainInput.value.trim() !== '';
+
+            if (hasDomain && isHttps && hasDomainInput) {
+                releaseDomainButton.disabled = false;
+            } else {
+                releaseDomainButton.disabled = true;
+            }
+        };
+
+        domainInput.addEventListener('input', () => {
+            validateDomainInputs();
+            updateReleaseButtonState();
+        });
+
+        validateDomainInputs();
+        updateReleaseButtonState();
+
+        // 도메인 등록 버튼 클릭
+        registerDomainButton.addEventListener('click', () => {
+            const domain = domainInput.value.trim();
+
+            if (!domain) {
+                showMessage("오류", "도메인을 먼저 입력해주세요.", false);
+                return;
+            }
+
+            if (domainInput.checkValidity() === false) {
+                showMessage("오류", "유효한 도메인 형식이 아닙니다.<br>예: example.com, sub.example.co.kr", false);
+                return;
+            }
+
+            modalDomainDisplay.textContent = domain;
+            registerDomainModal.classList.remove('hidden-modal');
+        });
+
+        // 도메인 등록 확인 (SSE)
+        let isRegisteringDomain = false;
+
+        confirmRegisterDomain.addEventListener('click', async () => {
+            if (isRegisteringDomain) return;
+
+            const domain = domainInput.value.trim();
+            const registerModalText = document.getElementById('registerModalText');
+            const registerProgressContainer = document.getElementById('registerProgressContainer');
+            const registerProgressText = document.getElementById('registerProgressText');
+
+            registerModalText.classList.add('hidden-modal');
+            registerProgressContainer.classList.remove('hidden-modal');
+            registerProgressText.textContent = '⏳ 도메인 등록을 시작합니다...';
+            registerProgressText.className = 'progress-text';
+
+            confirmRegisterDomain.disabled = true;
+            isRegisteringDomain = true;
+
+            try {
+                const response = await fetch(`${DOMAIN_BASE_URL}/apply_security`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domain: domain })
+                });
+
+                if (!response.ok) throw new Error(`서버 응답 오류: ${response.status}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.substring(6).trim();
+                            if (!jsonStr) continue;
+
+                            try {
+                                const data = JSON.parse(jsonStr);
+
+                                if (data.status === 'progress') {
+                                    registerProgressText.textContent = `${data.message}`;
+                                    registerProgressText.className = 'progress-text';
+                                } else if (data.status === 'success') {
+                                    currentDomainDisplay.textContent = domain;
+                                    currentDomain = domain;
+                                    domainInput.value = currentDomain;
+
+                                    securityStatusDisplay.textContent = '적용 (HTTPS)';
+                                    securityStatusDisplay.classList.remove('status-value-error');
+                                    securityStatusDisplay.classList.add('status-value-success');
+
+                                    registerProgressText.textContent = '도메인 등록이 완료되었습니다.';
+                                    registerProgressText.className = 'progress-text success';
+
+                                    updateReleaseButtonState();
+                                    updateDomainAccessButton();
+                                    validateWebhookEndpoint(); // 웹훅 URL 업데이트
+
+                                    confirmRegisterDomain.textContent = '확인';
+                                    confirmRegisterDomain.disabled = false;
+                                    isRegisteringDomain = false;
+                                    break;
+                                } else if (data.status === 'error') {
+                                    securityStatusDisplay.textContent = '미적용 (HTTP)';
+                                    securityStatusDisplay.classList.remove('status-value-success');
+                                    securityStatusDisplay.classList.add('status-value-error');
+
+                                    registerProgressText.textContent = `등록 실패: ${data.message}`;
+                                    registerProgressText.className = 'progress-text error';
+
+                                    confirmRegisterDomain.textContent = '확인';
+                                    confirmRegisterDomain.disabled = false;
+                                    isRegisteringDomain = false;
+                                    break;
+                                }
+                            } catch (parseError) {
+                                console.error("JSON 파싱 오류:", parseError);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                registerProgressText.textContent = `❌ 서버와 통신 중 오류 발생: ${error.message}`;
+                registerProgressText.className = 'progress-text error';
+
+                securityStatusDisplay.textContent = '미적용 (HTTP)';
+                securityStatusDisplay.classList.remove('status-value-success');
+                securityStatusDisplay.classList.add('status-value-error');
+
+                confirmRegisterDomain.textContent = '확인';
+                confirmRegisterDomain.disabled = false;
+                isRegisteringDomain = false;
+            }
+        });
+
+        // 도메인 등록 완료 후 확인 버튼
+        confirmRegisterDomain.addEventListener('click', (event) => {
+            if (!isRegisteringDomain && confirmRegisterDomain.textContent === '확인') {
+                event.stopImmediatePropagation();
+
+                registerDomainModal.classList.add('hidden-modal');
+                document.getElementById('registerModalText').classList.remove('hidden-modal');
+                document.getElementById('registerProgressContainer').classList.add('hidden-modal');
+                confirmRegisterDomain.textContent = '등록';
+                confirmRegisterDomain.disabled = false;
+            }
+        }, true);
+
+        // 도메인 등록 취소
+        cancelRegisterDomain.addEventListener('click', () => {
+            registerDomainModal.classList.add('hidden-modal');
+            document.getElementById('registerModalText').classList.remove('hidden-modal');
+            document.getElementById('registerProgressContainer').classList.add('hidden-modal');
+            confirmRegisterDomain.textContent = '등록';
+            confirmRegisterDomain.disabled = false;
+        });
+
+        // 도메인 해제 버튼 클릭
+        releaseDomainButton.addEventListener('click', () => {
+            const registeredDomain = currentDomainDisplay.textContent.trim();
+
+            if (registeredDomain === '없음' || !registeredDomain) {
+                showMessage("오류", "해제할 도메인이 없습니다.<br>먼저 도메인을 등록해주세요.", false);
+                return;
+            }
+
+            releaseDomainModal.classList.remove('hidden-modal');
+        });
+
+        // 도메인 해제 확인 (SSE)
+        let isReleasingDomain = false;
+
+        confirmReleaseDomain.addEventListener('click', async () => {
+            if (isReleasingDomain) return;
+
+            const ipAddress = vultrIpDisplay ? vultrIpDisplay.textContent.trim() : '';
+
+            if (!ipAddress || ipAddress === '확인 중...' || ipAddress === '') {
+                showMessage("오류", "유효한 IP 주소를 가져올 수 없습니다. 페이지를 새로고침하거나 잠시 후 다시 시도해주세요.", false);
+                return;
+            }
+
+            const releaseModalText = document.getElementById('releaseModalText');
+            const releaseProgressContainer = document.getElementById('releaseProgressContainer');
+            const releaseProgressText = document.getElementById('releaseProgressText');
+
+            releaseModalText.classList.add('hidden-modal');
+            releaseProgressContainer.classList.remove('hidden-modal');
+            releaseProgressText.textContent = '⏳ 도메인 해제를 시작합니다...';
+            releaseProgressText.className = 'progress-text';
+
+            confirmReleaseDomain.disabled = true;
+            isReleasingDomain = true;
+
+            try {
+                const response = await fetch(`${DOMAIN_BASE_URL}/release_security`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ip: ipAddress })
+                });
+
+                if (!response.ok) throw new Error(`서버 응답 오류: ${response.status}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const jsonStr = line.substring(6).trim();
+                            if (!jsonStr) continue;
+
+                            try {
+                                const data = JSON.parse(jsonStr);
+
+                                if (data.status === 'progress') {
+                                    releaseProgressText.textContent = `${data.message}`;
+                                    releaseProgressText.className = 'progress-text';
+                                } else if (data.status === 'success') {
+                                    currentDomainDisplay.textContent = '없음';
+                                    currentDomain = '';
+                                    domainInput.value = '';
+
+                                    securityStatusDisplay.textContent = '미적용 (HTTP)';
+                                    securityStatusDisplay.classList.remove('status-value-success');
+                                    securityStatusDisplay.classList.add('status-value-error');
+
+                                    releaseProgressText.textContent = '도메인 해제가 완료되었습니다.';
+                                    releaseProgressText.className = 'progress-text success';
+
+                                    updateReleaseButtonState();
+                                    updateDomainAccessButton();
+                                    validateWebhookEndpoint(); // 웹훅 URL 업데이트
+
+                                    confirmReleaseDomain.textContent = '확인';
+                                    confirmReleaseDomain.disabled = false;
+                                    confirmReleaseDomain.classList.remove('delete-button-confirm');
+                                    confirmReleaseDomain.classList.add('accent-color-bg');
+
+                                    isReleasingDomain = false;
+                                    break;
+                                } else if (data.status === 'error') {
+                                    releaseProgressText.textContent = `해제 실패: ${data.message}`;
+                                    releaseProgressText.className = 'progress-text error';
+
+                                    confirmReleaseDomain.textContent = '확인';
+                                    confirmReleaseDomain.disabled = false;
+                                    isReleasingDomain = false;
+                                    break;
+                                }
+                            } catch (parseError) {
+                                console.error("JSON 파싱 오류:", parseError);
+                            }
+                        }
+                    }
+                }
+            } catch (error) {
+                releaseProgressText.textContent = `❌ 서버와 통신 중 오류 발생: ${error.message}`;
+                releaseProgressText.className = 'progress-text error';
+
+                confirmReleaseDomain.textContent = '확인';
+                confirmReleaseDomain.disabled = false;
+                isReleasingDomain = false;
+            }
+        });
+
+        // 도메인 해제 완료 후 확인 버튼
+        confirmReleaseDomain.addEventListener('click', (event) => {
+            if (!isReleasingDomain && confirmReleaseDomain.textContent === '확인') {
+                event.stopImmediatePropagation();
+
+                releaseDomainModal.classList.add('hidden-modal');
+                document.getElementById('releaseModalText').classList.remove('hidden-modal');
+                document.getElementById('releaseProgressContainer').classList.add('hidden-modal');
+                confirmReleaseDomain.textContent = '해제';
+                confirmReleaseDomain.disabled = false;
+                confirmReleaseDomain.classList.remove('accent-color-bg');
+                confirmReleaseDomain.classList.add('delete-button-confirm');
+            }
+        }, true);
+
+        // 도메인 해제 취소
+        cancelReleaseDomain.addEventListener('click', () => {
+            releaseDomainModal.classList.add('hidden-modal');
+            document.getElementById('releaseModalText').classList.remove('hidden-modal');
+            document.getElementById('releaseProgressContainer').classList.add('hidden-modal');
+            confirmReleaseDomain.textContent = '해제';
+            confirmReleaseDomain.disabled = false;
+            confirmReleaseDomain.classList.remove('accent-color-bg');
+            confirmReleaseDomain.classList.add('delete-button-confirm');
+        });
+
+        // ====================================================
+        // 웹훅 관리 로직
+        // ====================================================
+
+        // 입력 필드 유효성 검사
+        const validateInput = () => {
+            const password = webhookInput.value.trim();
+            const isValid = password.length >= 4;
+
+            registerButton.disabled = !isValid;
+
+            // 입력 필드에 값이 있으면 해제 버튼 활성화
+            if (password) {
+                releaseButton.disabled = false;
+            }
+        };
+
+        webhookInput.addEventListener('input', validateInput);
+        validateInput();
+
+        // 등록 버튼 클릭
+        registerButton.addEventListener('click', () => {
+            const password = webhookInput.value.trim();
+
+            if (!password) {
+                showMessage("오류", "웹훅 패스워드를 먼저 입력해주세요.", false);
+                return;
+            }
+
+            if (password.length < 4) {
+                showMessage("오류", "웹훅 패스워드는 최소 4자 이상이어야 합니다.", false);
+                return;
+            }
+
+            registerModal.classList.remove('hidden-modal');
+        });
+
+        // 등록 확인
+        confirmRegister.addEventListener('click', async () => {
+            const password = webhookInput.value.trim();
+
+            confirmRegister.disabled = true;
+            confirmRegister.textContent = '등록 중...';
+
+            try {
+                const formData = new FormData();
+                formData.append('webhook_password', password);
+
+                const response = await fetch(`${BASE_URL}/register_webhook`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    registerModal.classList.add('hidden-modal');
+                    showMessage("등록 완료", data.message, true);
+                    releaseButton.disabled = false;
+                } else {
+                    registerModal.classList.add('hidden-modal');
+                    showMessage("등록 실패", data.detail || "등록 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                registerModal.classList.add('hidden-modal');
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                confirmRegister.disabled = false;
+                confirmRegister.textContent = '등록';
+            }
+        });
+
+        // 등록 취소
+        cancelRegister.addEventListener('click', () => {
+            registerModal.classList.add('hidden-modal');
+        });
+
+        // 해제 버튼 클릭
+        releaseButton.addEventListener('click', () => {
+            releaseModal.classList.remove('hidden-modal');
+        });
+
+        // 해제 확인
+        confirmRelease.addEventListener('click', async () => {
+            confirmRelease.disabled = true;
+            confirmRelease.textContent = '해제 중...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/release_webhook`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    releaseModal.classList.add('hidden-modal');
+                    showMessage("해제 완료", data.message, true);
+                    webhookInput.value = '';
+                    releaseButton.disabled = true;
+                    registerButton.disabled = true;
+                } else {
+                    releaseModal.classList.add('hidden-modal');
+                    showMessage("해제 실패", data.detail || "해제 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                releaseModal.classList.add('hidden-modal');
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                confirmRelease.disabled = false;
+                confirmRelease.textContent = '해제';
+            }
+        });
+
+        // 해제 취소
+        cancelRelease.addEventListener('click', () => {
+            releaseModal.classList.add('hidden-modal');
+        });
+
+        // ====================================================
+        // 웹훅 주소 관리 로직
+        // ====================================================
+
+        const webhookEndpointInput = document.getElementById('webhook-endpoint-input');
+        const registerEndpointButton = document.getElementById('registerEndpointButton');
+        const releaseEndpointButton = document.getElementById('releaseEndpointButton');
+        const webhookFullUrl = document.getElementById('webhookFullUrl');
+        const copyWebhookUrlButton = document.getElementById('copyWebhookUrlButton');
+
+        // 웹훅 주소 유효성 검사 및 버튼 상태 업데이트
+        const validateWebhookEndpoint = () => {
+            let inputValue = webhookEndpointInput.value.trim();
+
+            // / 로 시작하면 제거 (입력 필드에서는 / 없이 표시)
+            if (inputValue.startsWith('/')) {
+                inputValue = inputValue.substring(1);
+                webhookEndpointInput.value = inputValue;
+            }
+
+            // 웹훅 URL 생성 시에는 / 자동 추가
+            let endpoint = inputValue ? '/' + inputValue : '/webhook';
+
+            // 도메인이 있으면 도메인 사용, 없으면 IP 사용
+            const domain = currentDomain && currentDomain !== '없음' ? currentDomain : '';
+            const vultrIp = vultrIpDisplay ? vultrIpDisplay.textContent.trim() : '';
+            const host = domain || vultrIp;
+            webhookFullUrl.textContent = `http://${host}${endpoint}`;
+
+            // 등록 버튼: 입력값이 있으면 활성화
+            if (inputValue && inputValue !== '') {
+                registerEndpointButton.disabled = false;
+            } else {
+                registerEndpointButton.disabled = true;
+            }
+
+            // 해제 버튼: 현재 값이 기본값이 아닌 경우 활성화
+            const isDefaultValue = (inputValue === 'webhook' || inputValue === '');
+            if (inputValue && !isDefaultValue) {
+                releaseEndpointButton.disabled = false;
+            } else {
+                releaseEndpointButton.disabled = true;
+            }
+        };
+
+        webhookEndpointInput.addEventListener('input', validateWebhookEndpoint);
+
+        // 페이지 로드 시 초기 상태 설정
+        validateWebhookEndpoint();
+
+        // 웹훅 주소 등록 모달
+        const registerEndpointModal = document.getElementById('registerEndpointModal');
+        const confirmRegisterEndpoint = document.getElementById('confirmRegisterEndpoint');
+        const cancelRegisterEndpoint = document.getElementById('cancelRegisterEndpoint');
+
+        // 웹훅 주소 해제 모달
+        const releaseEndpointModal = document.getElementById('releaseEndpointModal');
+        const confirmReleaseEndpoint = document.getElementById('confirmReleaseEndpoint');
+        const cancelReleaseEndpoint = document.getElementById('cancelReleaseEndpoint');
+
+        // 웹훅 주소 등록 버튼 클릭
+        registerEndpointButton.addEventListener('click', () => {
+            let endpoint = webhookEndpointInput.value.trim();
+
+            if (!endpoint) {
+                showMessage("오류", "웹훅 주소를 입력해주세요.", false);
+                return;
+            }
+
+            registerEndpointModal.classList.remove('hidden-modal');
+        });
+
+        // 웹훅 주소 등록 확인
+        confirmRegisterEndpoint.addEventListener('click', async () => {
+            let endpoint = webhookEndpointInput.value.trim();
+
+            // / 로 시작하도록 보장
+            if (!endpoint.startsWith('/')) {
+                endpoint = '/' + endpoint;
+            }
+
+            confirmRegisterEndpoint.disabled = true;
+            confirmRegisterEndpoint.textContent = '등록 중...';
+
+            try {
+                const formData = new FormData();
+                formData.append('webhook_endpoint', endpoint);
+
+                const response = await fetch(`${BASE_URL}/register_endpoint`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    registerEndpointModal.classList.add('hidden-modal');
+                    showMessage("등록 완료", data.message, true);
+                    webhookEndpointInput.value = endpoint;
+                    validateWebhookEndpoint();
+                } else {
+                    registerEndpointModal.classList.add('hidden-modal');
+                    showMessage("등록 실패", data.detail || "등록 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                registerEndpointModal.classList.add('hidden-modal');
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                confirmRegisterEndpoint.disabled = false;
+                confirmRegisterEndpoint.textContent = '등록';
+            }
+        });
+
+        // 웹훅 주소 등록 취소
+        cancelRegisterEndpoint.addEventListener('click', () => {
+            registerEndpointModal.classList.add('hidden-modal');
+        });
+
+        // 웹훅 주소 해제 버튼 클릭
+        releaseEndpointButton.addEventListener('click', () => {
+            releaseEndpointModal.classList.remove('hidden-modal');
+        });
+
+        // 웹훅 주소 해제 확인
+        confirmReleaseEndpoint.addEventListener('click', async () => {
+            confirmReleaseEndpoint.disabled = true;
+            confirmReleaseEndpoint.textContent = '해제 중...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/release_endpoint`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    releaseEndpointModal.classList.add('hidden-modal');
+                    showMessage("해제 완료", data.message, true);
+                    webhookEndpointInput.value = 'webhook';
+                    validateWebhookEndpoint();
+                } else {
+                    releaseEndpointModal.classList.add('hidden-modal');
+                    showMessage("해제 실패", data.detail || "해제 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                releaseEndpointModal.classList.add('hidden-modal');
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                confirmReleaseEndpoint.disabled = false;
+                confirmReleaseEndpoint.textContent = '해제';
+            }
+        });
+
+        // 웹훅 주소 해제 취소
+        cancelReleaseEndpoint.addEventListener('click', () => {
+            releaseEndpointModal.classList.add('hidden-modal');
+        });
+
+        // 웹훅 URL 복사
+        copyWebhookUrlButton.addEventListener('click', () => {
+            const url = webhookFullUrl.textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                showMessage("복사 완료", "웹훅 URL이 클립보드에 복사되었습니다.", true);
+            }).catch(err => {
+                showMessage("복사 실패", "URL 복사 중 오류가 발생했습니다.", false);
+            });
+        });
+
+        // JSON 복사
+        const copyJsonButton = document.getElementById('copyJsonButton');
+        const tradingviewJson = document.getElementById('tradingviewJson');
+
+        copyJsonButton.addEventListener('click', () => {
+            const jsonText = tradingviewJson.textContent;
+            navigator.clipboard.writeText(jsonText).then(() => {
+                showMessage("복사 완료", "JSON이 클립보드에 복사되었습니다.", true);
+            }).catch(err => {
+                showMessage("복사 실패", "JSON 복사 중 오류가 발생했습니다.", false);
+            });
+        });
+
+        // ====================================================
+        // 접근 허용 IP 관리 로직
+        // ====================================================
+
+        const allowedIpsInput = document.getElementById('allowed-ips-input');
+        const registerIpsButton = document.getElementById('registerIpsButton');
+        const releaseIpsButton = document.getElementById('releaseIpsButton');
+
+        // 서버에서 전달된 기본값 (home_ip 포함)
+        const defaultAllowedIps = '{{ default_allowed_ips }}';
+
+        // IP 입력 필드 유효성 검사
+        const validateAllowedIps = () => {
+            const ips = allowedIpsInput.value.trim();
+
+            // 기본값이면 해제 버튼 비활성화
+            if (ips === defaultAllowedIps || ips === '') {
+                releaseIpsButton.disabled = true;
+            } else {
+                releaseIpsButton.disabled = false;
+            }
+        };
+
+        // 입력 필드 변경 시 검증
+        allowedIpsInput.addEventListener('input', validateAllowedIps);
+
+        // 페이지 로드 시 초기 검증
+        validateAllowedIps();
+
+        // IP 등록
+        registerIpsButton.addEventListener('click', async () => {
+            const ips = allowedIpsInput.value.trim();
+
+            if (!ips) {
+                showMessage("오류", "허용할 IP 주소를 입력해주세요.", false);
+                return;
+            }
+
+            registerIpsButton.disabled = true;
+            registerIpsButton.textContent = '등록 중...';
+
+            try {
+                const formData = new FormData();
+                formData.append('allowed_ips', ips);
+
+                const response = await fetch(`${BASE_URL}/register_ips`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage("등록 완료", data.message, true);
+                    validateAllowedIps(); // 버튼 상태 업데이트
+                } else {
+                    showMessage("등록 실패", data.detail || "등록 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                registerIpsButton.disabled = false;
+                registerIpsButton.textContent = '접근 허용 IP 등록';
+            }
+        });
+
+        // IP 해제 (기본값으로 초기화)
+        releaseIpsButton.addEventListener('click', async () => {
+            releaseIpsButton.disabled = true;
+            releaseIpsButton.textContent = '해제 중...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/release_ips`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage("해제 완료", data.message, true);
+                    allowedIpsInput.value = defaultAllowedIps;
+                    validateAllowedIps(); // 버튼 상태 업데이트 (비활성화)
+                } else {
+                    showMessage("해제 실패", data.detail || "해제 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                releaseIpsButton.disabled = false;
+                releaseIpsButton.textContent = '접근 허용 IP 해제';
+            }
+        });
+
+        // ====================================================
+        // 비밀번호 표시/숨김 토글
+        // ====================================================
+        document.querySelectorAll('.password-toggle-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                const eyeIcon = button.querySelector('.eye-icon');
+                const eyeSlashIcon = button.querySelector('.eye-slash-icon');
+
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    eyeIcon.style.display = 'none';
+                    eyeSlashIcon.style.display = 'block';
+                } else {
+                    input.type = 'password';
+                    eyeIcon.style.display = 'block';
+                    eyeSlashIcon.style.display = 'none';
+                }
+            });
+        });
+
+        console.log("보안 관리 페이지 로드됨.");
+    });
+</script>
+{% endblock %}

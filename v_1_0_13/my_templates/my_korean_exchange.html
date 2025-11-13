@@ -1,0 +1,475 @@
+{% extends "my_base.html" %}
+
+{% block title %}업비트 - H-ATS Admin{% endblock %}
+
+{% block page_header %}업비트 관리{% endblock %}
+
+{% block content %}
+
+<div class="card messenger-card">
+    <h2 class="card-title">업비트</h2>
+    <p class="messenger-description-text">
+        <span class="messenger-text-span">
+            업비트의 내 계정에 접근할 수 있는 API 키와 시크릿 키를 등록합니다.
+        </span>
+    </p>
+    <hr class="card-hr">
+
+    <h3 class="section-header">업비트 API 키</h3>
+
+    <div>
+        <div style="position: relative; margin-bottom: 25px;">
+            <input type="password" id="upbit-api-key-input" placeholder="API 키를 입력하세요"
+                class="webhook-input" value="{{ upbit_api_key }}" style="padding-right: 40px; margin-bottom: 0;">
+            <button type="button" class="password-toggle-btn" data-target="upbit-api-key-input" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; color: #9ca3af; opacity: 0.7; transition: opacity 0.3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <svg class="eye-slash-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/>
+                </svg>
+            </button>
+        </div>
+
+        <h3 class="section-header">업비트 시크릿 키</h3>
+
+        <div style="position: relative; margin-bottom: 25px;">
+            <input type="password" id="upbit-secret-key-input" placeholder="시크릿 키를 입력하세요"
+                class="webhook-input" value="{{ upbit_secret_key }}" style="padding-right: 40px; margin-bottom: 0;">
+            <button type="button" class="password-toggle-btn" data-target="upbit-secret-key-input" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: transparent; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; color: #9ca3af; opacity: 0.7; transition: opacity 0.3s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'">
+                <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <svg class="eye-slash-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: none;">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                    <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="button-group">
+            <button id="registerUpbitButton" class="small-button accent-color-bg full-width-button">등록</button>
+            <button id="releaseUpbitButton" class="small-button delete-button full-width-button"
+                {% if not upbit_api_key %}disabled{% endif %}>해제</button>
+        </div>
+    </div>
+</div>
+
+<!-- 등록 확인 모달 -->
+<div id="registerUpbitModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-success">업비트 API 키 등록 확인</h3>
+        <p class="modal-text">
+            업비트 API 키와 시크릿 키를 등록합니다.<br><br>
+            <span class="modal-text-success">등록 후 디스코드로 알림 메시지가 전송됩니다.</span>
+        </p>
+        <div class="modal-actions">
+            <button id="confirmRegisterUpbit" class="small-button accent-color-bg">등록</button>
+            <button id="cancelRegisterUpbit" class="small-button secondary-color-bg">취소</button>
+        </div>
+    </div>
+</div>
+
+<!-- 해제 확인 모달 -->
+<div id="releaseUpbitModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 class="modal-header-danger">업비트 API 키 해제 확인</h3>
+        <p class="modal-text">
+            업비트 API 키 연동을 해제합니다.<br><br>
+            <span class="modal-text-danger">더 이상 업비트 계정에 접근할 수 없습니다.</span>
+        </p>
+        <div class="modal-actions">
+            <button id="confirmReleaseUpbit" class="small-button delete-button-confirm">해제</button>
+            <button id="cancelReleaseUpbit" class="small-button secondary-color-bg">취소</button>
+        </div>
+    </div>
+</div>
+
+<!-- 메시지 모달 -->
+<div id="messageModal" class="modal-overlay hidden-modal">
+    <div class="modal-content">
+        <h3 id="messageModalHeader" class="modal-header-success"></h3>
+        <p id="messageModalText" class="modal-text"></p>
+        <div class="modal-actions">
+            <button id="closeMessageModal" class="small-button secondary-color-bg">확인</button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_head_styles %}
+<style>
+    .card {
+        background-color: var(--header-bg-dark);
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        border: 1px solid var(--border-color-dark);
+    }
+
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .hidden-modal {
+        display: none !important;
+    }
+
+    .modal-content {
+        background-color: var(--header-bg-dark);
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+        border: 1px solid var(--border-color-dark);
+        max-width: 400px;
+        width: 90%;
+        text-align: center;
+    }
+
+    .modal-header-success {
+        color: #8BC34A;
+        font-size: 1.5em;
+        margin-bottom: 30px;
+        margin-top: 0;
+    }
+
+    .modal-header-danger {
+        color: #ff4d4d;
+        font-size: 1.5em;
+        margin-bottom: 30px;
+        margin-top: 0;
+    }
+
+    .modal-text {
+        color: var(--text-color-light);
+        margin-bottom: 15px;
+        line-height: 1.4;
+        font-size: 1em;
+    }
+
+    .modal-text-success {
+        color: #83ff52;
+    }
+
+    .modal-text-danger {
+        color: #ff4d4d;
+        margin-bottom: 25px;
+        font-size: 1em;
+    }
+
+    .modal-actions {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 30px;
+    }
+
+    .card-title {
+        color: var(--subtitle-color);
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 1.5em;
+    }
+
+    .messenger-description-text {
+        color: var(--text-color-light);
+        margin-top: 5px;
+        margin-bottom: 15px;
+        line-height: 1.4;
+    }
+
+    .card-hr {
+        border: 0;
+        height: 1px;
+        background-color: var(--border-color-dark);
+        margin-top: 20px;
+        margin-bottom: 30px;
+    }
+
+    .section-header {
+        color: var(--text-color-light);
+        margin-top: 35px;
+        margin-bottom: 10px;
+        font-size: 1.2em;
+    }
+
+    .webhook-input {
+        width: 100%;
+        padding: 12px;
+        margin-top: 0;
+        margin-bottom: 25px;
+        border: 1px solid #444;
+        border-radius: 6px;
+        background-color: var(--sidebar-bg-dark);
+        color: var(--text-color-light);
+        font-size: 1em;
+        box-sizing: border-box;
+    }
+
+    .webhook-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+    }
+
+    .button-group {
+        display: flex;
+        gap: 10px;
+        margin-top: 0px;
+    }
+
+    .small-button {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s, opacity 0.3s;
+        color: var(--text-color-light);
+        font-size: 1em;
+        flex-grow: 1;
+    }
+
+    .small-button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .accent-color-bg {
+        background-color: var(--accent-color);
+    }
+
+    .accent-color-bg:hover:not(:disabled) {
+        background-color: #0056b3;
+    }
+
+    .secondary-color-bg {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .secondary-color-bg:hover {
+        background-color: #5a6268;
+    }
+
+    .delete-button {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .delete-button:hover:not(:disabled) {
+        background-color: #c82333;
+    }
+
+    .delete-button-confirm {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .delete-button-confirm:hover {
+        background-color: #c82333;
+    }
+
+    .full-width-button {
+        padding: 10px 20px;
+        border-radius: 6px;
+    }
+
+</style>
+{% endblock %}
+
+{% block page_script %}
+<script>
+    const BASE_URL = '/admin/korean_exchange';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const registerButton = document.getElementById('registerUpbitButton');
+        const registerModal = document.getElementById('registerUpbitModal');
+        const confirmRegister = document.getElementById('confirmRegisterUpbit');
+        const cancelRegister = document.getElementById('cancelRegisterUpbit');
+
+        const releaseButton = document.getElementById('releaseUpbitButton');
+        const releaseModal = document.getElementById('releaseUpbitModal');
+        const confirmRelease = document.getElementById('confirmReleaseUpbit');
+        const cancelRelease = document.getElementById('cancelReleaseUpbit');
+
+        const apiKeyInput = document.getElementById('upbit-api-key-input');
+        const secretKeyInput = document.getElementById('upbit-secret-key-input');
+
+        const messageModal = document.getElementById('messageModal');
+        const messageModalHeader = document.getElementById('messageModalHeader');
+        const messageModalText = document.getElementById('messageModalText');
+        const closeMessageModal = document.getElementById('closeMessageModal');
+
+        // 메시지 모달 표시 함수
+        const showMessage = (header, text, isSuccess = true) => {
+            messageModalHeader.textContent = header;
+            messageModalText.innerHTML = text;
+
+            messageModalHeader.classList.remove('modal-header-danger', 'modal-header-success');
+            if (isSuccess) {
+                messageModalHeader.classList.add('modal-header-success');
+            } else {
+                messageModalHeader.classList.add('modal-header-danger');
+            }
+
+            messageModal.classList.remove('hidden-modal');
+        };
+
+        // 모달 닫기
+        closeMessageModal.addEventListener('click', () => {
+            messageModal.classList.add('hidden-modal');
+        });
+
+        // 입력 필드 유효성 검사
+        const validateInput = () => {
+            const apiKey = apiKeyInput.value.trim();
+            const secretKey = secretKeyInput.value.trim();
+            const isValid = apiKey && secretKey;
+
+            registerButton.disabled = !isValid;
+
+            // 입력 필드에 값이 있으면 해제 버튼 활성화
+            if (apiKey || secretKey) {
+                releaseButton.disabled = false;
+            }
+        };
+
+        apiKeyInput.addEventListener('input', validateInput);
+        secretKeyInput.addEventListener('input', validateInput);
+        validateInput();
+
+        // 등록 버튼 클릭
+        registerButton.addEventListener('click', () => {
+            const apiKey = apiKeyInput.value.trim();
+            const secretKey = secretKeyInput.value.trim();
+
+            if (!apiKey || !secretKey) {
+                showMessage("오류", "업비트 API 키와 시크릿 키를 모두 입력해주세요.", false);
+                return;
+            }
+
+            registerModal.classList.remove('hidden-modal');
+        });
+
+        // 등록 확인
+        confirmRegister.addEventListener('click', async () => {
+            const apiKey = apiKeyInput.value.trim();
+            const secretKey = secretKeyInput.value.trim();
+
+            confirmRegister.disabled = true;
+            confirmRegister.textContent = '등록 중...';
+
+            try {
+                const formData = new FormData();
+                formData.append('api_key', apiKey);
+                formData.append('secret_key', secretKey);
+
+                const response = await fetch(`${BASE_URL}/register_upbit`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    registerModal.classList.add('hidden-modal');
+                    showMessage("등록 완료", data.message, true);
+                    releaseButton.disabled = false;
+                } else {
+                    registerModal.classList.add('hidden-modal');
+                    showMessage("등록 실패", data.detail || "등록 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                registerModal.classList.add('hidden-modal');
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                confirmRegister.disabled = false;
+                confirmRegister.textContent = '등록';
+            }
+        });
+
+        // 등록 취소
+        cancelRegister.addEventListener('click', () => {
+            registerModal.classList.add('hidden-modal');
+        });
+
+        // 해제 버튼 클릭
+        releaseButton.addEventListener('click', () => {
+            releaseModal.classList.remove('hidden-modal');
+        });
+
+        // 해제 확인
+        confirmRelease.addEventListener('click', async () => {
+            confirmRelease.disabled = true;
+            confirmRelease.textContent = '해제 중...';
+
+            try {
+                const response = await fetch(`${BASE_URL}/release_upbit`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    releaseModal.classList.add('hidden-modal');
+                    showMessage("해제 완료", data.message, true);
+                    apiKeyInput.value = '';
+                    secretKeyInput.value = '';
+                    releaseButton.disabled = true;
+                    registerButton.disabled = true;
+                } else {
+                    releaseModal.classList.add('hidden-modal');
+                    showMessage("해제 실패", data.detail || "해제 중 오류가 발생했습니다.", false);
+                }
+            } catch (error) {
+                releaseModal.classList.add('hidden-modal');
+                showMessage("오류", `서버와 통신 중 오류 발생: ${error.message}`, false);
+            } finally {
+                confirmRelease.disabled = false;
+                confirmRelease.textContent = '해제';
+            }
+        });
+
+        // 해제 취소
+        cancelRelease.addEventListener('click', () => {
+            releaseModal.classList.add('hidden-modal');
+        });
+
+        // 비밀번호 표시/숨김 토글
+        document.querySelectorAll('.password-toggle-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const targetId = button.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                const eyeIcon = button.querySelector('.eye-icon');
+                const eyeSlashIcon = button.querySelector('.eye-slash-icon');
+
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    eyeIcon.style.display = 'none';
+                    eyeSlashIcon.style.display = 'block';
+                } else {
+                    input.type = 'password';
+                    eyeIcon.style.display = 'block';
+                    eyeSlashIcon.style.display = 'none';
+                }
+            });
+        });
+
+        console.log("업비트 관리 페이지 로드됨.");
+    });
+</script>
+{% endblock %}
