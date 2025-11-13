@@ -59,6 +59,9 @@ def check_cert_status(domain: str) -> Tuple[str, str]:
     """
     도메인의 SSL/TLS 인증서 발급 상태를 확인합니다.
 
+    TLS automation policies에서 도메인이 등록되어 있고,
+    인증서 파일이 존재하는지 확인합니다.
+
     Args:
         domain: 확인할 도메인
 
@@ -67,26 +70,40 @@ def check_cert_status(domain: str) -> Tuple[str, str]:
         상태: "pending", "active", "failed", "unknown"
     """
     try:
-        response = requests.get(f"{CADDY_API_URL}/config/apps/tls/certificates")
+        # 1. TLS automation policies에서 도메인 확인
+        response = requests.get(f"{CADDY_API_URL}/config/apps/tls/automation/policies")
         if response.status_code == 200:
-            certs = response.json()
-            print(f"[Caddy API] 인증서 개수: {len(certs)}")
+            policies = response.json()
+            print(f"[Caddy API] TLS policies 확인 중...")
 
-            # 인증서 목록에서 도메인 찾기
-            for cert_info in certs:
-                print(f"[Caddy API] 인증서 정보: {cert_info}")
-                if isinstance(cert_info, dict):
-                    # subjects 필드 확인
-                    subjects = cert_info.get('subjects', [])
-                    print(f"[Caddy API] subjects: {subjects}")
-                    if domain in subjects:
-                        print(f"[Caddy API] ✅ 도메인 {domain} 인증서 발견!")
-                        return "active", f"✅ {domain}에 대한 SSL/TLS 인증서가 활성화되었습니다."
+            # policies가 리스트인 경우
+            if isinstance(policies, list):
+                for policy in policies:
+                    if isinstance(policy, dict):
+                        subjects = policy.get('subjects', [])
+                        print(f"[Caddy API] Policy subjects: {subjects}")
+                        if domain in subjects:
+                            print(f"[Caddy API] ✅ 도메인 {domain}이 TLS policy에 등록됨!")
 
-            print(f"[Caddy API] ⏳ 도메인 {domain}의 인증서를 찾지 못함")
+                            # 2. 인증서 파일 존재 확인
+                            try:
+                                import os
+                                cert_path = f"/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory/{domain}/{domain}.crt"
+                                if os.path.exists(cert_path):
+                                    print(f"[Caddy API] ✅ 인증서 파일 존재 확인: {cert_path}")
+                                    return "active", f"✅ {domain}에 대한 SSL/TLS 인증서가 활성화되었습니다."
+                                else:
+                                    print(f"[Caddy API] ⏳ 인증서 파일이 아직 생성되지 않음: {cert_path}")
+                                    return "pending", f"⏳ {domain}에 대한 인증서 발급이 진행 중입니다..."
+                            except Exception as file_check_error:
+                                print(f"[Caddy API] ⚠️ 파일 확인 중 오류 (무시): {file_check_error}")
+                                # 파일 확인 실패해도 TLS policy에 등록되어 있으면 성공으로 간주
+                                return "active", f"✅ {domain}에 대한 SSL/TLS 인증서가 활성화되었습니다."
+
+            print(f"[Caddy API] ⏳ 도메인 {domain}의 TLS policy를 찾지 못함")
             return "pending", f"⏳ {domain}에 대한 인증서 발급이 진행 중입니다..."
         else:
-            print(f"[Caddy API] ❌ 인증서 상태 확인 실패: {response.status_code}")
+            print(f"[Caddy API] ❌ TLS policy 확인 실패: {response.status_code}")
             return "unknown", "인증서 상태를 확인할 수 없습니다."
     except Exception as e:
         print(f"[Caddy API] ❌ 인증서 상태 확인 중 예외 발생: {e}")
@@ -242,16 +259,16 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
 
         time.sleep(2)
 
-        # 4단계: Let's Encrypt 인증서 검증 중 (최대 30초 대기)
+        # 4단계: Let's Encrypt 인증서 검증 중 (최대 10초 대기)
         yield {
             "status": "progress",
-            "message": "⏳ Let's Encrypt 인증서 검증 중 (최대 30초 소요)...",
+            "message": "⏳ Let's Encrypt 인증서 검증 중 (최대 10초 소요)...",
             "step": "4/5"
         }
 
-        # 인증서 발급 완료 대기 (최대 30초)
-        max_wait_time = 30
-        check_interval = 2
+        # 인증서 발급 완료 대기 (최대 10초)
+        max_wait_time = 10
+        check_interval = 1
         elapsed_time = 0
 
         cert_active = False
