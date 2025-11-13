@@ -65,7 +65,7 @@
     <h2 class="card-title">접근 허용 IP</h2>
     <p class="security-description-text">
         <span class="security-text-span">
-            웹훅 요청을 허용할 IP 주소를 설정합니다. 트레이딩뷰의 기본 IP가 미리 설정되어 있습니다.
+            웹훅 요청을 허용할 IP 주소를 설정합니다.<br>관리자 IP 와 트레이딩뷰의 기본 IP가 미리 설정되어 있습니다.
         </span>
     </p>
     <hr class="card-hr">
@@ -73,7 +73,7 @@
     <h3 class="section-header">
         접근 허용 IP
         <span class="info-tooltip-icon"
-            data-tooltip="{% if home_ip %}HOME IP&#10;{{ home_ip }}&#10;&#10;{% endif %}트레이딩뷰 기본 IP&#10;52.89.214.238&#10;34.212.75.30&#10;54.218.53.128&#10;52.32.178.7">
+            data-tooltip="{% if admin_ip %}관리자 IP&#10;{{ admin_ip }}&#10;&#10;{% endif %}트레이딩뷰 기본 IP&#10;52.89.214.238&#10;34.212.75.30&#10;54.218.53.128&#10;52.32.178.7">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" />
                 <path d="M12 16V12" stroke="white" stroke-width="2" stroke-linecap="round" />
@@ -108,7 +108,7 @@
     <h3 class="section-header">
         웹훅 주소
         <span class="info-tooltip-icon"
-            data-tooltip="트레이딩뷰 웹훅 URL의 엔드포인트를 설정합니다.&#10;&#10;• 도메인이 등록되어 있으면 도메인 사용&#10;• 도메인이 없으면 HOME IP 사용&#10;&#10;예시:&#10;http://도메인/webhook&#10;http://HOME_IP/webhook">
+            data-tooltip="웹훅 URL의 엔드포인트를 설정합니다.&#10;&#10;• 도메인이 등록되어 있으면 도메인 사용&#10;• 도메인이 없으면 관리자 IP 사용&#10;• 엔드포인트 기본값 /webhook&#10;&#10;예시:&#10;https://도메인/webhook&#10;http://관리자 IP/webhook">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="12" cy="12" r="10" stroke="white" stroke-width="2" />
                 <path d="M12 16V12" stroke="white" stroke-width="2" stroke-linecap="round" />
@@ -133,8 +133,8 @@
         <div class="status-content">
             <p style="margin: 0;">
                 <span class="status-label">웹훅 URL :</span>
-                <span class="status-value-url" id="webhookFullUrl">{% if domain_name and domain_name != '없음' %}http://{{
-                    domain_name }}{{ webhook_endpoint }}{% else %}http://{{ home_ip }}{{ webhook_endpoint }}{% endif
+                <span class="status-value-url" id="webhookFullUrl">{% if domain_name and domain_name != '없음' %}https://{{
+                    domain_name }}{{ webhook_endpoint }}{% else %}http://{{ admin_ip }}{{ webhook_endpoint }}{% endif
                     %}</span>
                 <button id="copyWebhookUrlButton" class="copy-button" data-tooltip="클릭하여 웹훅 URL 복사">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -855,8 +855,8 @@
         const securityStatusDisplay = document.getElementById('securityStatusDisplay');
         const domainAccessButton = document.getElementById('domainAccessButton');
 
-        // HOME IP 요소 가져오기 (서버에서 전달된 값)
-        const homeIp = '{{ home_ip }}' || '';
+        // 관리자 IP 요소 가져오기 (서버에서 전달된 값)
+        const homeIp = '{{ admin_ip }}' || '';
 
         // ===== 웹훅 관리 요소 =====
         const registerButton = document.getElementById('registerWebhookButton');
@@ -1140,7 +1140,7 @@
             const ipAddress = homeIp;
 
             if (!ipAddress || ipAddress === '') {
-                showMessage("오류", "유효한 HOME IP 주소를 가져올 수 없습니다. 페이지를 새로고침하거나 잠시 후 다시 시도해주세요.", false);
+                showMessage("오류", "유효한 관리자 IP 주소를 가져올 수 없습니다. 페이지를 새로고침하거나 잠시 후 다시 시도해주세요.", false);
                 return;
             }
 
@@ -1403,10 +1403,11 @@
             // 웹훅 URL 생성 시에는 / 자동 추가
             let endpoint = inputValue ? '/' + inputValue : '/webhook';
 
-            // 도메인이 있으면 도메인 사용, 없으면 HOME IP 사용
+            // 도메인이 있으면 도메인 사용, 없으면 관리자 IP 사용
             const domain = currentDomain && currentDomain !== '없음' ? currentDomain : '';
             const host = domain || homeIp;
-            webhookFullUrl.textContent = `http://${host}${endpoint}`;
+            const protocol = domain ? 'https' : 'http';
+            webhookFullUrl.textContent = `${protocol}://${host}${endpoint}`;
 
             // 등록 버튼: 입력값이 있으면 활성화
             if (inputValue && inputValue !== '') {
@@ -1568,7 +1569,7 @@
         const registerIpsButton = document.getElementById('registerIpsButton');
         const releaseIpsButton = document.getElementById('releaseIpsButton');
 
-        // 서버에서 전달된 기본값 (home_ip 포함)
+        // 서버에서 전달된 기본값 (admin_ip 포함)
         const defaultAllowedIps = '{{ default_allowed_ips }}';
 
         // IP 입력 필드 유효성 검사

@@ -129,21 +129,21 @@ def release_domain_with_progress_mock(ip_address: str) -> Generator[Dict[str, st
     time.sleep(0.7)
     print(f"[Mock Caddy API] ✅ 가상 도메인 라우트 삭제 성공")
 
-    # 5단계: HOME IP 전용 설정으로 초기화
+    # 5단계: 관리자 IP 전용 설정으로 초기화
     yield {
         "status": "progress",
-        "message": "⏳ [모의] HOME IP 전용 설정 적용 중...",
+        "message": "⏳ [모의] 관리자 IP 전용 설정 적용 중...",
         "step": "5/5"
     }
     time.sleep(0.8)
-    print(f"[Mock Caddy API] ✅ 가상 HOME IP 전용 설정 적용 성공")
+    print(f"[Mock Caddy API] ✅ 가상 관리자 IP 전용 설정 적용 성공")
 
     # 완료
-    mock_home_ip = "127.0.0.1"  # Windows 로컬 테스트용
+    mock_admin_ip = "127.0.0.1"  # Windows 로컬 테스트용
     print(f"[Mock Caddy API] ✅ 가상 도메인 해제 완료: IP={ip_address}")
     yield {
         "status": "success",
-        "message": f"✅ [모의 테스트 성공] 도메인 해제 완료! HOME IP ({mock_home_ip})로만 HTTP 접근이 가능합니다.",
+        "message": f"✅ [모의 테스트 성공] 도메인 해제 완료! 관리자 IP ({mock_admin_ip})로만 HTTP 접근이 가능합니다.",
         "step": "5/5",
         "domain_name": "없음",
         "security_status": "HTTP"

@@ -16,7 +16,7 @@ from my_utilities.my_db import (
     update_webhook_endpoint,
     get_allowed_ips,
     update_allowed_ips,
-    get_home_ip
+    get_admin_ip
 )
 from .my_index import get_server_info
 
@@ -40,7 +40,7 @@ async def get_security_page(
     webhook_password = get_webhook_password(current_user_id)
     webhook_endpoint = get_webhook_endpoint(current_user_id)
     allowed_ips = get_allowed_ips(current_user_id)
-    home_ip = get_home_ip(current_user_id)
+    admin_ip = get_admin_ip(current_user_id)
 
     # DB에서 도메인 및 보안 상태 조회
     domain_config = get_domain_security_config(current_user_id)
@@ -48,19 +48,19 @@ async def get_security_page(
     # 서버 정보 가져오기
     server_info = get_server_info(request)
 
-    # allowed_ips 기본값 설정 (home_ip가 있으면 항상 포함)
+    # allowed_ips 기본값 설정 (admin_ip가 있으면 항상 포함)
     default_tradingview_ips = "52.89.214.238, 34.212.75.30, 54.218.53.128, 52.32.178.7"
 
     # 기본값 계산 (해제 버튼 disabled 판단용)
-    default_allowed_ips = f"{home_ip}, {default_tradingview_ips}" if home_ip else default_tradingview_ips
+    default_allowed_ips = f"{admin_ip}, {default_tradingview_ips}" if admin_ip else default_tradingview_ips
 
     # DB에서 가져온 allowed_ips가 없으면 기본값 사용
     if not allowed_ips:
         allowed_ips = default_allowed_ips
     else:
-        # DB에 저장된 값이 있어도 home_ip가 포함되어 있지 않으면 추가
-        if home_ip and home_ip not in allowed_ips:
-            allowed_ips = f"{home_ip}, {allowed_ips}"
+        # DB에 저장된 값이 있어도 admin_ip가 포함되어 있지 않으면 추가
+        if admin_ip and admin_ip not in allowed_ips:
+            allowed_ips = f"{admin_ip}, {allowed_ips}"
 
     context = {
         "request": request,
@@ -70,7 +70,7 @@ async def get_security_page(
         "webhook_endpoint": webhook_endpoint if webhook_endpoint else "/webhook",
         "allowed_ips": allowed_ips,
         "default_allowed_ips": default_allowed_ips,
-        "home_ip": home_ip if home_ip else "",
+        "admin_ip": admin_ip if admin_ip else "",
         "domain_name": domain_config.get("domain_name", "없음"),
         "security_status": domain_config.get("security_status", "HTTP"),
         **server_info  # 서버 정보 추가 (my_ip, server_ip 등)
@@ -361,13 +361,13 @@ async def release_allowed_ips(
     import os
     import subprocess
 
-    # home_ip 조회
-    home_ip = get_home_ip(current_user_id)
+    # admin_ip 조회
+    admin_ip = get_admin_ip(current_user_id)
     default_tradingview_ips = "52.89.214.238, 34.212.75.30, 54.218.53.128, 52.32.178.7"
 
-    # home_ip가 있으면 맨 앞에 추가
-    if home_ip:
-        default_ips = f"{home_ip}, {default_tradingview_ips}"
+    # admin_ip가 있으면 맨 앞에 추가
+    if admin_ip:
+        default_ips = f"{admin_ip}, {default_tradingview_ips}"
     else:
         default_ips = default_tradingview_ips
 

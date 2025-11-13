@@ -12,7 +12,7 @@ from my_utilities.my_config_password import (
     check_setup_mode          
 )
 # DB 관련 함수 임포트 (delete_admin_id 제거)
-from my_utilities.my_db import create_admin_id, check_admin_id_exists
+from my_utilities.my_db import create_admin_id, check_admin_id_exists, update_admin_ip
 from my_utilities.my_authorization import redirect_login, set_no_cache_headers 
 # ★ 통합 초기화 함수 임포트
 from my_utilities.my_reset import run_full_system_reset 
@@ -96,13 +96,27 @@ async def process_login(
     # ... (최초 설정 및 일반 로그인 로직은 변경 없음) ...
     if is_setup_mode:
         new_hash = encrypt_password(input_password)
-        
+
         success = create_admin_id(input_id, new_hash)
-        
+
         if not success:
             error_message = "최초 설정 중 DB 오류가 발생했습니다."
             return RedirectResponse(url=f"/admin/first_login?error={error_message}", status_code=302)
-        
+
+        # 최초 설정 시 클라이언트 IP를 관리자 IP로 자동 등록
+        # 리버스 프록시를 통한 접속인 경우 X-Forwarded-For 헤더에서 실제 IP 가져오기
+        client_ip = request.headers.get("X-Forwarded-For")
+        if client_ip:
+            # X-Forwarded-For에 여러 IP가 있을 수 있으므로 첫 번째 IP 사용
+            client_ip = client_ip.split(",")[0].strip()
+        else:
+            # X-Forwarded-For 헤더가 없으면 request.client.host 사용
+            client_ip = request.client.host if request.client else None
+
+        if client_ip:
+            update_admin_ip(input_id, client_ip)
+            print(f"✅ 관리자 IP({client_ip})가 관리자({input_id})에게 자동 등록되었습니다.")
+
         authenticated_id = input_id
         
     else:

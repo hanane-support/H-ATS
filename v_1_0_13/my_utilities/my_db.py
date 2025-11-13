@@ -606,12 +606,12 @@ def update_allowed_ips(admin_id: str, allowed_ips: str) -> bool:
         conn.close()
 
 
-def get_home_ip(admin_id: str) -> Optional[str]:
+def get_admin_ip(admin_id: str) -> Optional[str]:
     """
-    주어진 관리자 ID의 Home IP를 DB에서 조회합니다.
+    주어진 관리자 ID의 관리자 IP를 DB에서 조회합니다.
 
     Returns:
-        Optional[str]: Home IP (없으면 None)
+        Optional[str]: 관리자 IP (없으면 None)
     """
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -625,13 +625,13 @@ def get_home_ip(admin_id: str) -> Optional[str]:
     return None
 
 
-def update_home_ip(admin_id: str, home_ip: str) -> bool:
+def update_admin_ip(admin_id: str, admin_ip: str) -> bool:
     """
-    주어진 관리자 ID의 Home IP를 DB에 업데이트합니다.
+    주어진 관리자 ID의 관리자 IP를 DB에 업데이트합니다.
 
     Args:
         admin_id: 관리자 ID
-        home_ip: 설정할 Home IP
+        admin_ip: 설정할 관리자 IP
 
     Returns:
         bool: 성공 여부
@@ -642,12 +642,12 @@ def update_home_ip(admin_id: str, home_ip: str) -> bool:
     try:
         cursor.execute(
             "UPDATE admin SET home_ip = ? WHERE id = ?",
-            (home_ip, admin_id)
+            (admin_ip, admin_id)
         )
         conn.commit()
         return True
     except sqlite3.Error as e:
-        print(f"DB Home IP 업데이트 오류: {e}")
+        print(f"DB 관리자 IP 업데이트 오류: {e}")
         return False
     finally:
         conn.close()

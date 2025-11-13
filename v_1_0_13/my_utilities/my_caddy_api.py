@@ -17,7 +17,7 @@ import os
 from typing import Tuple, Dict, Optional, Generator
 
 # DB 함수 임포트
-from my_utilities.my_db import get_home_ip, get_allowed_ips
+from my_utilities.my_db import get_admin_ip, get_allowed_ips
 
 # 모의(Mock) 테스트 모드 확인
 # Windows 로컬 테스트: set CADDY_MOCK_MODE=true
@@ -93,7 +93,7 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
     Args:
         domain: 등록할 도메인
         email: Let's Encrypt 알림용 이메일 (선택사항)
-        admin_id: 관리자 ID (DB에서 HOME_IP 및 allowed_ips 조회용)
+        admin_id: 관리자 ID (DB에서 관리자 IP 및 allowed_ips 조회용)
 
     Yields:
         {"status": "progress/success/error", "message": "메시지"} 형식의 딕셔너리
@@ -106,12 +106,12 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
 
     print(f"[Caddy API] 🚀 도메인 등록 함수 시작: {domain}")
 
-    # DB에서 HOME_IP 조회
-    home_ip = get_home_ip(admin_id) if admin_id else None
-    if not home_ip:
+    # DB에서 관리자 IP 조회
+    admin_ip = get_admin_ip(admin_id) if admin_id else None
+    if not admin_ip:
         yield {
             "status": "error",
-            "message": "❌ HOME_IP를 DB에서 찾을 수 없습니다. 관리자 설정을 확인해주세요."
+            "message": "❌ 관리자 IP를 DB에서 찾을 수 없습니다. 관리자 설정을 확인해주세요."
         }
         return
 
@@ -120,10 +120,10 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
     # 쉼표로 분리하고 공백 제거
     allowed_ips_list = [ip.strip() for ip in allowed_ips_str.split(",") if ip.strip()] if allowed_ips_str else []
 
-    # HOME_IP를 리스트 맨 앞에 추가
-    all_allowed_ips = [home_ip] + allowed_ips_list
+    # 관리자 IP를 리스트 맨 앞에 추가
+    all_allowed_ips = [admin_ip] + allowed_ips_list
 
-    print(f"[Caddy API] 🏠 HOME_IP: {home_ip}")
+    print(f"[Caddy API] 🏠 관리자 IP: {admin_ip}")
     print(f"[Caddy API] 🌐 허용 IP 목록: {all_allowed_ips}")
     try:
         # 1단계: Caddyfile 업데이트 시작
@@ -151,7 +151,7 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
                                     }],
                                     "terminal": True
                                 },
-                                # IP 제한 라우트 (HOME_IP + 허용 IP 목록)
+                                # IP 제한 라우트 (관리자 IP + 허용 IP 목록)
                                 {
                                     "@id": "ip_matcher",
                                     "match": [{
@@ -314,7 +314,7 @@ def release_domain_with_progress(admin_id: str = None) -> Generator[Dict[str, st
     Caddy Admin API의 DELETE를 사용하여 도메인 라우트와 TLS 설정을 제거합니다.
 
     Args:
-        admin_id: 관리자 ID (DB에서 HOME_IP 조회용)
+        admin_id: 관리자 ID (DB에서 관리자 IP 조회용)
 
     Yields:
         {"status": "progress/success/error", "message": "메시지"} 형식의 딕셔너리
@@ -327,16 +327,16 @@ def release_domain_with_progress(admin_id: str = None) -> Generator[Dict[str, st
 
     print(f"[Caddy API] 🚀 도메인 해제 함수 시작")
 
-    # DB에서 HOME_IP 조회
-    home_ip = get_home_ip(admin_id) if admin_id else None
-    if not home_ip:
+    # DB에서 관리자 IP 조회
+    admin_ip = get_admin_ip(admin_id) if admin_id else None
+    if not admin_ip:
         yield {
             "status": "error",
-            "message": "❌ HOME_IP를 DB에서 찾을 수 없습니다. 관리자 설정을 확인해주세요."
+            "message": "❌ 관리자 IP를 DB에서 찾을 수 없습니다. 관리자 설정을 확인해주세요."
         }
         return
 
-    print(f"[Caddy API] 🏠 HOME_IP: {home_ip}")
+    print(f"[Caddy API] 🏠 관리자 IP: {admin_ip}")
     try:
         # 1단계: 현재 설정 가져오기
         yield {
@@ -437,7 +437,7 @@ def release_domain_with_progress(admin_id: str = None) -> Generator[Dict[str, st
                                 {
                                     "match": [{
                                         "remote_ip": {
-                                            "ranges": [f"{home_ip}/32"]
+                                            "ranges": [f"{admin_ip}/32"]
                                         }
                                     }],
                                     "handle": [{
@@ -480,10 +480,10 @@ def release_domain_with_progress(admin_id: str = None) -> Generator[Dict[str, st
         time.sleep(1)
 
         # 완료
-        print(f"[Caddy API] ✅ 도메인 해제 완료: HOME IP={home_ip}")
+        print(f"[Caddy API] ✅ 도메인 해제 완료: HOME IP={admin_ip}")
         yield {
             "status": "success",
-            "message": f"✅ 도메인 해제 완료! HOME IP ({home_ip})로만 HTTP 접근이 가능합니다.",
+            "message": f"✅ 도메인 해제 완료! HOME IP ({admin_ip})로만 HTTP 접근이 가능합니다.",
             "step": "5/5",
             "domain_name": "없음",
             "security_status": "HTTP"
