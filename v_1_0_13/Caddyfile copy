@@ -1,0 +1,20 @@
+# Caddy Admin API를 로컬호스트에 바인딩
+{
+    admin 127.0.0.1:2019
+}
+
+# 초기 접근: MY_IP로 접근하는 관리자 콘솔만 허용
+:80 {
+    @myip {
+        remote_ip 61.85.61.62
+    }
+
+    handle @myip {
+        reverse_proxy 127.0.0.1:8000
+    }
+
+    # IP가 일치하지 않는 모든 요청은 접근을 거부합니다.
+    handle {
+        respond "Access Denied" 403
+    }
+}
