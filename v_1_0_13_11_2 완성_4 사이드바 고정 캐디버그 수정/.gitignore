@@ -32,3 +32,6 @@ my_admin_config.db
 # 캐디 파일
 caddy.exe
 Caddyfile
+
+# nul 파일
+nul
