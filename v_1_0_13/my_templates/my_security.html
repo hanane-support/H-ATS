@@ -1064,6 +1064,39 @@
                                     confirmRegisterDomain.disabled = false;
                                     isRegisteringDomain = false;
                                     break;
+                                } else if (data.status === 'rate_limited') {
+                                    // Rate Limit 에러 처리
+                                    securityStatusDisplay.textContent = '미적용 (HTTP)';
+                                    securityStatusDisplay.classList.remove('status-value-success');
+                                    securityStatusDisplay.classList.add('status-value-error');
+
+                                    // Rate Limit 상세 정보 표시
+                                    let rateLimitMsg = data.message;
+                                    if (data.rate_limit_info) {
+                                        const retryDate = new Date(data.rate_limit_info.retry_after);
+                                        const retryDateStr = retryDate.toLocaleString('ko-KR', {
+                                            year: 'numeric',
+                                            month: 'long',
+                                            day: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit'
+                                        });
+                                        rateLimitMsg = `🚫 Let's Encrypt 인증서 발급 제한\n\n` +
+                                                      `사유: ${data.rate_limit_info.message}\n` +
+                                                      `재시도 가능 일시: ${retryDateStr}\n\n` +
+                                                      `💡 해결 방법:\n` +
+                                                      `1. 기존 인증서가 있다면 재사용됩니다.\n` +
+                                                      `2. 발급 제한이 해제될 때까지 기다려주세요.\n` +
+                                                      `3. 다른 도메인으로 시도하거나, 기존 도메인을 유지해주세요.`;
+                                    }
+
+                                    registerProgressText.textContent = rateLimitMsg;
+                                    registerProgressText.className = 'progress-text error';
+
+                                    confirmRegisterDomain.textContent = '확인';
+                                    confirmRegisterDomain.disabled = false;
+                                    isRegisteringDomain = false;
+                                    break;
                                 } else if (data.status === 'error') {
                                     securityStatusDisplay.textContent = '미적용 (HTTP)';
                                     securityStatusDisplay.classList.remove('status-value-success');

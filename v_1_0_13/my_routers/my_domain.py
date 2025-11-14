@@ -10,7 +10,8 @@ from my_utilities.my_caddy_api import (
     register_domain_with_progress,
     release_domain_with_progress,
     get_domain_from_caddy,
-    check_if_https_active
+    check_if_https_active,
+    check_cert_exists_in_storage
 )
 from .my_index import get_server_info
 

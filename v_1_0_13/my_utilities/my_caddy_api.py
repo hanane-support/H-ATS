@@ -161,6 +161,130 @@ def check_cert_status(domain: str) -> Tuple[str, str]:
         return "unknown", f"인증서 상태 확인 중 오류 발생: {e}"
 
 
+def parse_rate_limit_error(error_text: str) -> Optional[Dict]:
+    """
+    Let's Encrypt Rate Limit 에러를 파싱하여 상세 정보를 추출합니다.
+
+    Args:
+        error_text: Caddy 또는 ACME 에러 메시지
+
+    Returns:
+        Rate Limit 정보 딕셔너리 또는 None
+        - is_rate_limited: True/False
+        - limit_type: "certificates_per_domain", "duplicate_certificate", etc.
+        - retry_after: 재시도 가능 일시 (ISO 8601 형식)
+        - message: 사용자 친화적 메시지
+    """
+    import re
+    from datetime import datetime, timedelta
+
+    if not error_text:
+        return None
+
+    error_lower = error_text.lower()
+
+    # Let's Encrypt Rate Limit 관련 키워드 확인
+    rate_limit_keywords = [
+        "too many certificates",
+        "rate limit",
+        "ratelimit",
+        "too many failed authorizations",
+        "too many registrations"
+    ]
+
+    is_rate_limited = any(keyword in error_lower for keyword in rate_limit_keywords)
+
+    if not is_rate_limited:
+        return None
+
+    # Rate Limit 타입 판단
+    limit_type = "unknown"
+    retry_days = 7  # 기본값: 7일
+
+    if "too many certificates" in error_lower or "certificates per domain" in error_lower:
+        limit_type = "certificates_per_domain"
+        retry_days = 7
+    elif "duplicate certificate" in error_lower:
+        limit_type = "duplicate_certificate"
+        retry_days = 7
+    elif "too many failed authorizations" in error_lower:
+        limit_type = "failed_validations"
+        retry_days = 1
+    elif "too many registrations" in error_lower:
+        limit_type = "registrations"
+        retry_days = 1
+
+    # Retry-After 날짜 파싱 시도
+    retry_after = None
+
+    # "Retry after YYYY-MM-DD" 형식 찾기
+    retry_pattern = r"retry after (\d{4}-\d{2}-\d{2})"
+    match = re.search(retry_pattern, error_lower)
+    if match:
+        retry_after = f"{match.group(1)}T00:00:00Z"
+    else:
+        # 날짜를 찾지 못하면 현재 시간 + retry_days로 계산
+        future_date = datetime.utcnow() + timedelta(days=retry_days)
+        retry_after = future_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # 사용자 친화적 메시지 생성
+    messages = {
+        "certificates_per_domain": f"도메인당 인증서 발급 제한 (주당 50개)에 도달했습니다.",
+        "duplicate_certificate": "동일한 인증서를 너무 자주 요청했습니다.",
+        "failed_validations": "인증 실패 횟수가 너무 많습니다.",
+        "registrations": "계정 등록 횟수가 너무 많습니다.",
+        "unknown": "Let's Encrypt 발급 제한에 도달했습니다."
+    }
+
+    return {
+        "is_rate_limited": True,
+        "limit_type": limit_type,
+        "retry_after": retry_after,
+        "retry_days": retry_days,
+        "message": messages.get(limit_type, messages["unknown"])
+    }
+
+
+def check_cert_exists_in_storage(domain: str) -> Tuple[bool, Optional[Dict]]:
+    """
+    Caddy의 인증서 저장소에 해당 도메인의 인증서가 이미 존재하는지 확인합니다.
+    (Let's Encrypt에서 이전에 발급받은 인증서가 있는지 확인)
+
+    Returns:
+        (존재 여부, 인증서 정보) 튜플
+        - 인증서 정보: {"subjects": [...], "issuer": "...", "not_after": "...", "hash": "..."}
+    """
+    if MOCK_MODE:
+        print(f"[MOCK] check_cert_exists_in_storage({domain}) 호출 - (False, None) 반환")
+        return False, None
+
+    try:
+        response = requests.get(f"{CADDY_API_URL}/config/apps/tls/certificates")
+        if response.status_code == 200:
+            certs = response.json()
+
+            # 인증서 목록에서 도메인 찾기
+            for cert_info in certs:
+                if isinstance(cert_info, dict) and 'subjects' in cert_info:
+                    if domain in cert_info.get('subjects', []):
+                        print(f"[Caddy API] 🔐 인증서 저장소에서 발견: {domain}")
+                        return True, {
+                            "subjects": cert_info.get('subjects', []),
+                            "issuer": cert_info.get('issuer', {}).get('common_name', 'Unknown'),
+                            "not_after": cert_info.get('not_after', ''),
+                            "hash": cert_info.get('hash', '')
+                        }
+
+            print(f"[Caddy API] ℹ️ 인증서 저장소에 {domain} 없음")
+            return False, None
+        else:
+            print(f"[Caddy API] ⚠️ 인증서 조회 실패: {response.status_code}")
+            return False, None
+    except Exception as e:
+        print(f"[Caddy API] ❌ 인증서 조회 중 오류: {e}")
+        return False, None
+
+
 def register_domain_with_progress(domain: str, email: str = "", admin_id: str = None) -> Generator[Dict[str, str], None, None]:
     """
     도메인을 등록하고 진행 상황을 실시간으로 yield합니다. (SSE용)
@@ -358,27 +482,78 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
             }
         else:
             # 인증서 발급 실패 (10초 후에도 발급 안 됨)
+            # Rate Limit 여부 확인 (Caddy 로그 또는 에러 메시지 분석)
+            rate_limit_info = None
+            try:
+                # Caddy 에러 로그 확인 (실제 환경에서는 로그 파일 경로 확인 필요)
+                # 여기서는 cert_message를 분석
+                rate_limit_info = parse_rate_limit_error(cert_message)
+            except:
+                pass
+
             print(f"[Caddy API] ⚠️ 도메인 설정 완료했으나 인증서 발급 실패: {domain}")
-            yield {
-                "status": "warning",
-                "message": (
-                    "⚠️ 도메인 설정은 완료되었으나, 인증서 발급에 실패했습니다.\n\n"
-                    "DNS 설정을 확인하고 잠시 후 다시 시도해 주세요.\n"
-                    "1. 도메인 관리 페이지에서 A 레코드가 서버 IP를 가리키는지 확인\n"
-                    "2. DNS 전파는 최대 1시간 이상 소요될 수 있습니다."
-                ),
-                "step": "5/5",
-                "domain_name": domain,
-                "security_status": "HTTP"
-            }
+
+            if rate_limit_info and rate_limit_info.get("is_rate_limited"):
+                # Rate Limit 에러 발생
+                print(f"[Caddy API] 🚫 Rate Limit 감지: {rate_limit_info}")
+                yield {
+                    "status": "rate_limited",
+                    "message": (
+                        "🚫 Let's Encrypt 인증서 발급 제한\n\n"
+                        f"사유: {rate_limit_info['message']}\n"
+                        f"재시도 가능 일시: {rate_limit_info['retry_after']}\n\n"
+                        "💡 해결 방법:\n"
+                        "1. 기존 인증서가 있다면 재사용됩니다.\n"
+                        "2. 발급 제한이 해제될 때까지 기다려주세요.\n"
+                        "3. 다른 도메인으로 시도하거나, 기존 도메인을 유지해주세요."
+                    ),
+                    "step": "5/5",
+                    "domain_name": domain,
+                    "security_status": "HTTP",
+                    "rate_limit_info": rate_limit_info
+                }
+            else:
+                # 일반적인 인증서 발급 실패
+                yield {
+                    "status": "warning",
+                    "message": (
+                        "⚠️ 도메인 설정은 완료되었으나, 인증서 발급에 실패했습니다.\n\n"
+                        "DNS 설정을 확인하고 잠시 후 다시 시도해 주세요.\n"
+                        "1. 도메인 관리 페이지에서 A 레코드가 서버 IP를 가리키는지 확인\n"
+                        "2. DNS 전파는 최대 1시간 이상 소요될 수 있습니다."
+                    ),
+                    "step": "5/5",
+                    "domain_name": domain,
+                    "security_status": "HTTP"
+                }
 
     except Exception as e:
         error_msg = f"❌ 오류 발생: {str(e)}"
         print(f"[Caddy API] {error_msg}")
-        yield {
-            "status": "error",
-            "message": error_msg
-        }
+
+        # Exception 메시지에서도 Rate Limit 확인
+        rate_limit_info = parse_rate_limit_error(str(e))
+
+        if rate_limit_info and rate_limit_info.get("is_rate_limited"):
+            print(f"[Caddy API] 🚫 Rate Limit 감지 (Exception): {rate_limit_info}")
+            yield {
+                "status": "rate_limited",
+                "message": (
+                    "🚫 Let's Encrypt 인증서 발급 제한\n\n"
+                    f"사유: {rate_limit_info['message']}\n"
+                    f"재시도 가능 일시: {rate_limit_info['retry_after']}\n\n"
+                    "💡 해결 방법:\n"
+                    "1. 기존 인증서가 있다면 재사용됩니다.\n"
+                    "2. 발급 제한이 해제될 때까지 기다려주세요.\n"
+                    "3. 다른 도메인으로 시도하거나, 기존 도메인을 유지해주세요."
+                ),
+                "rate_limit_info": rate_limit_info
+            }
+        else:
+            yield {
+                "status": "error",
+                "message": error_msg
+            }
 
 
 def release_domain_with_progress(admin_id: str = None) -> Generator[Dict[str, str], None, None]:
