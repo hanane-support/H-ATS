@@ -15,6 +15,7 @@ import time
 import json
 import os
 from typing import Tuple, Dict, Optional, Generator
+from pathlib import Path
 
 # DB 함수 임포트
 from my_utilities.my_db import get_admin_ip, get_allowed_ips
@@ -302,6 +303,107 @@ def parse_rate_limit_error(error_text: str) -> Optional[Dict]:
     }
 
 
+def check_cert_in_disk_storage(domain: str) -> bool:
+    """
+    Caddy의 디스크 저장소에서 도메인 인증서 파일이 존재하는지 확인합니다.
+    (메모리에 로드되지 않았어도 디스크에는 있을 수 있음)
+
+    Returns:
+        디스크에 인증서 존재 여부
+    """
+    if MOCK_MODE:
+        print(f"[MOCK] check_cert_in_disk_storage({domain}) 호출 - False 반환")
+        return False
+
+    try:
+        # Caddy 기본 데이터 디렉토리 경로들
+        possible_paths = [
+            Path("/var/lib/caddy/.local/share/caddy/certificates"),
+            Path("/root/.local/share/caddy/certificates"),
+            Path("~/.local/share/caddy/certificates").expanduser(),
+        ]
+
+        for base_path in possible_paths:
+            if not base_path.exists():
+                continue
+
+            # acme-v02.api.letsencrypt.org-directory 하위 도메인 폴더 확인
+            acme_dir = base_path / "acme-v02.api.letsencrypt.org-directory"
+            if acme_dir.exists():
+                domain_dir = acme_dir / domain
+                if domain_dir.exists() and domain_dir.is_dir():
+                    # .crt 또는 .key 파일이 있는지 확인
+                    cert_files = list(domain_dir.glob("*.crt")) + list(domain_dir.glob("*.key"))
+                    if cert_files:
+                        print(f"[Caddy API] 🔐 디스크 저장소에서 인증서 발견: {domain_dir}")
+                        return True
+
+        print(f"[Caddy API] ℹ️ 디스크 저장소에 {domain} 인증서 없음")
+        return False
+    except Exception as e:
+        print(f"[Caddy API] ⚠️ 디스크 저장소 확인 중 오류: {e}")
+        return False
+
+
+def check_cert_history_external(domain: str) -> bool:
+    """
+    외부 API (crt.sh)를 통해 도메인의 인증서 발급 이력을 확인합니다.
+    최근 7일 이내 인증서 발급이 있었는지 확인하여 Rate Limit 가능성을 판단합니다.
+
+    Returns:
+        최근 7일 이내 인증서 발급 이력 존재 여부
+    """
+    if MOCK_MODE:
+        print(f"[MOCK] check_cert_history_external({domain}) 호출 - False 반환")
+        return False
+
+    try:
+        from datetime import datetime, timedelta
+
+        # crt.sh API 호출
+        url = f"https://crt.sh/?q={domain}&output=json"
+        response = requests.get(url, timeout=5)
+
+        if response.status_code != 200:
+            print(f"[Caddy API] ⚠️ crt.sh API 호출 실패: {response.status_code}")
+            return False
+
+        certs = response.json()
+        if not isinstance(certs, list) or len(certs) == 0:
+            print(f"[Caddy API] ℹ️ crt.sh에 {domain} 인증서 이력 없음")
+            return False
+
+        # 최근 7일 기준
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        recent_count = 0
+
+        for cert in certs:
+            # entry_timestamp 파싱 (ISO 8601 형식)
+            entry_time_str = cert.get("entry_timestamp", "")
+            if entry_time_str:
+                try:
+                    # "2025-11-13T06:51:33.768" 형식 파싱
+                    entry_time = datetime.fromisoformat(entry_time_str.replace('Z', '+00:00'))
+                    if entry_time > seven_days_ago:
+                        recent_count += 1
+                except:
+                    pass
+
+        if recent_count >= 5:
+            print(f"[Caddy API] 🚫 crt.sh 확인: 최근 7일 내 {recent_count}개 인증서 발급됨 (Rate Limit 가능성 높음)")
+            return True
+        elif recent_count > 0:
+            print(f"[Caddy API] ℹ️ crt.sh 확인: 최근 7일 내 {recent_count}개 인증서 발급됨")
+            return True
+        else:
+            print(f"[Caddy API] ✅ crt.sh 확인: 최근 7일 내 인증서 발급 없음")
+            return False
+
+    except Exception as e:
+        print(f"[Caddy API] ⚠️ crt.sh 조회 중 오류: {e}")
+        return False
+
+
 def check_cert_exists_in_storage(domain: str) -> Tuple[bool, Optional[Dict]]:
     """
     Caddy의 인증서 저장소에 해당 도메인의 인증서가 이미 존재하는지 확인합니다.
@@ -578,11 +680,27 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
             # 전략 3: 타이밍 기반 추론 (즉시 실패 = Rate Limit 가능성)
             is_instant_failure = actual_elapsed < 3.0  # 3초 이내 실패
 
-            # 전략 4: 기존 인증서 존재 여부로 추론
-            has_existing_cert = cert_exists  # 0단계에서 확인한 값
+            # 전략 4: 기존 인증서 존재 여부로 추론 (다중 소스 확인)
+            has_existing_cert = cert_exists  # 0단계: Caddy 메모리 확인
 
-            # Rate Limit 판단 (기존 인증서가 있고 즉시 실패한 경우)
-            is_likely_rate_limited = has_existing_cert and is_instant_failure
+            # 전략 4-1: Caddy 디스크 저장소 확인 (메모리에 없어도 디스크에는 있을 수 있음)
+            if not has_existing_cert:
+                has_existing_cert = check_cert_in_disk_storage(domain)
+                if has_existing_cert:
+                    print(f"[Caddy API] 🔍 디스크 저장소에서 기존 인증서 발견")
+
+            # 전략 4-2: 외부 API (crt.sh)로 인증서 이력 확인
+            has_cert_history = False
+            if not has_existing_cert:
+                has_cert_history = check_cert_history_external(domain)
+                if has_cert_history:
+                    print(f"[Caddy API] 🔍 외부 API에서 최근 인증서 발급 이력 확인")
+
+            # Rate Limit 판단 (다중 조건)
+            is_likely_rate_limited = (
+                (has_existing_cert and is_instant_failure) or  # 기존 인증서 + 즉시 실패
+                (has_cert_history and is_instant_failure)      # 인증서 이력 + 즉시 실패
+            )
 
             if rate_limit_info and rate_limit_info.get("is_rate_limited"):
                 # 명확한 Rate Limit 에러 발견
@@ -623,8 +741,15 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
                     "rate_limit_info": rate_limit_info
                 }
             elif is_likely_rate_limited:
-                # 타이밍 + 기존 인증서로 Rate Limit 추론
-                print(f"[Caddy API] 🔍 Rate Limit 추론: 기존 인증서 존재 + 즉시 실패 (경과: {actual_elapsed:.1f}초)")
+                # 타이밍 + 기존 인증서/이력으로 Rate Limit 추론
+                evidence = []
+                if has_existing_cert:
+                    evidence.append("기존 인증서 발견")
+                if has_cert_history:
+                    evidence.append("최근 발급 이력 확인")
+                evidence.append(f"즉시 실패 ({actual_elapsed:.1f}초)")
+
+                print(f"[Caddy API] 🔍 Rate Limit 추론: {', '.join(evidence)}")
 
                 # 기존 인증서 재사용 시도
                 if has_existing_cert:
@@ -635,7 +760,7 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
                             "message": (
                                 f"✅ 기존 인증서로 HTTPS 활성화 완료!\n\n"
                                 f"💡 {domain}으로 안전하게 접속할 수 있습니다.\n"
-                                f"(새 인증서 발급은 제한된 것으로 보이나, 기존 인증서를 재사용합니다.)"
+                                f"(새 인증서 발급은 제한되었으나, 기존 인증서를 재사용합니다.)"
                             ),
                             "step": "5/5",
                             "domain_name": domain,
@@ -643,16 +768,29 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
                         }
                         return
 
+                # Rate Limit 상세 메시지
+                detail_msg = ""
+                if has_cert_history:
+                    detail_msg = (
+                        f"📊 최근 7일 이내에 이 도메인에 대한 인증서가 이미 발급되었습니다.\n"
+                        f"Let's Encrypt는 같은 도메인에 대해 주당 5회 제한을 적용합니다.\n\n"
+                    )
+                else:
+                    detail_msg = (
+                        f"이 도메인에 대해 최근 인증서를 발급받은 적이 있습니다.\n"
+                        f"Let's Encrypt는 같은 도메인에 대해 주당 5회 제한을 적용합니다.\n\n"
+                    )
+
                 yield {
                     "status": "rate_limited",
                     "message": (
-                        "🚫 인증서 발급 제한 가능성\n\n"
-                        f"이 도메인에 대해 최근 인증서를 발급받은 적이 있습니다.\n"
-                        f"Let's Encrypt는 같은 도메인에 대해 주당 5회 제한을 적용합니다.\n\n"
+                        "🚫 Let's Encrypt 인증서 발급 제한 감지\n\n"
+                        f"{detail_msg}"
                         "💡 해결 방법:\n"
-                        "1. 기존 인증서를 재사용합니다 (자동 시도됨).\n"
-                        "2. 1주일 후 다시 시도해주세요.\n"
-                        "3. 급한 경우 다른 도메인을 사용해주세요."
+                        "1. 기존 인증서가 디스크에 있으면 자동으로 재사용됩니다.\n"
+                        "2. 약 1주일(168시간) 후 다시 시도해주세요.\n"
+                        "3. 급한 경우 다른 도메인을 사용해주세요.\n\n"
+                        "ℹ️ 자세한 정보: https://letsencrypt.org/docs/rate-limits/"
                     ),
                     "step": "5/5",
                     "domain_name": domain,
