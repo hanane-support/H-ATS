@@ -559,9 +559,12 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
                                 "subjects": [domain],
                                 "issuers": [
                                     {
-                                        "module": "acme"
+                                        "module": "acme",
+                                        "ca": "https://acme-v02.api.letsencrypt.org/directory"
                                     }
-                                ]
+                                ],
+                                "on_demand": False,
+                                "reuse_private_keys": True
                             }
                         ]
                     }
@@ -598,6 +601,22 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
         print(f"[Caddy API] ✅ Caddy 설정 적용 성공")
 
         time.sleep(1)
+
+        # 2.5단계: 디스크에 저장된 기존 인증서 확인 및 로드 시도
+        if cert_exists or check_cert_in_disk_storage(domain):
+            print(f"[Caddy API] 🔐 기존 인증서 발견, Caddy 재로드 시도")
+            try:
+                # Caddy에게 인증서를 다시 로드하도록 요청 (설정 재적용)
+                reload_response = requests.post(
+                    f"{CADDY_API_URL}/load",
+                    json=config,
+                    headers={"Content-Type": "application/json"}
+                )
+                if reload_response.status_code in [200, 204]:
+                    print(f"[Caddy API] ✅ 기존 인증서 로드 시도 완료")
+                time.sleep(1)
+            except Exception as e:
+                print(f"[Caddy API] ⚠️ 인증서 재로드 중 오류: {e}")
 
         # 3단계: SSL/TLS 인증서 발급 요청 확인
         yield {
