@@ -141,14 +141,19 @@ apt install caddy -y
 systemctl daemon-reload
 
 CADDY_CONF="/etc/caddy/Caddyfile"
-echo ">> Caddyfile (${CADDY_CONF}) 생성 및 초기 설정 (Admin API 활성화 및 HOME_IP + 트레이딩뷰 IP 제한)..."
+echo ">> Caddyfile (${CADDY_CONF}) 생성 및 초기 설정 (Admin API 활성화)..."
 cat <<EOF | sudo tee "$CADDY_CONF" > /dev/null
-# Caddy Admin API를 로컬호스트에 바인딩
+# Caddy Admin API를 로컬호스트에 바인딩 (포트 2019)
 {
     admin 127.0.0.1:2019
+
+    # ACME 설정: Production 환경
+    email admin@example.com
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
-# 초기 접근: HOME_IP + 트레이딩뷰 기본 IP 허용
+# 초기 접근: HOME_IP + 트레이딩뷰 기본 IP 허용 (HTTP만)
+# 도메인 등록 전까지는 Admin API로 동적 관리됨
 :80 {
     @allowed_ips {
         remote_ip ${HOME_IP} 52.89.214.238 34.212.75.30 54.218.53.128 52.32.178.7
@@ -163,10 +168,36 @@ cat <<EOF | sudo tee "$CADDY_CONF" > /dev/null
         respond "Access Denied" 403
     }
 }
+
+# HTTPS 포트는 초기에는 비활성화
+# 사용자가 웹 UI에서 "보안 적용" 클릭 시 Admin API로 동적 추가됨
 EOF
+
+echo ">> Caddy 데이터 디렉토리 권한 설정..."
+# Caddy가 인증서를 저장할 디렉토리 권한 설정
+mkdir -p /var/lib/caddy/.local/share/caddy
+chown -R caddy:caddy /var/lib/caddy
+chmod -R 750 /var/lib/caddy
+
+# 루트 사용자 디렉토리도 생성 (Admin API가 root로 실행될 경우 대비)
+mkdir -p /root/.local/share/caddy
+chmod -R 750 /root/.local/share/caddy
 
 echo ">> Caddy 서비스 시작 및 설정 적용..."
 systemctl enable caddy
 systemctl restart caddy
 
-echo ">> 배포 스크립트가 완료되었습니다. 상태는 'server_log'를 확인하십시오."
+# Caddy 서비스 상태 확인
+echo ">> Caddy 서비스 상태 확인..."
+systemctl status caddy --no-pager -l
+
+echo ""
+echo "=========================================="
+echo "✅ 배포 스크립트 완료!"
+echo "=========================================="
+echo "📋 다음 단계:"
+echo "1. http://${HOME_IP}:${APP_PORT} 접속 (또는 Admin API로 설정된 IP)"
+echo "2. 웹 UI에서 도메인 등록 및 HTTPS 활성화"
+echo "3. 로그 확인: sudo supervisorctl status ${SUPERVISOR_PROGRAM_NAME}"
+echo "4. Caddy 로그: sudo journalctl -u caddy -f"
+echo "=========================================="
