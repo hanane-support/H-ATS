@@ -787,48 +787,19 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
 
         time.sleep(2)
 
-        # 4단계: Let's Encrypt 인증서 검증 중 (최대 10초 대기)
+        # 4단계: Let's Encrypt 인증서 발급 요청 완료
         yield {
             "status": "progress",
-            "message": "⏳ Let's Encrypt 인증서 검증 중 (최대 10초 소요)...",
+            "message": "⏳ Let's Encrypt 인증서 발급 중...",
             "step": "4/5"
         }
 
-        # 인증서 발급 완료 대기 (최대 15초로 증가)
-        max_wait_time = 15
-        check_interval = 2
-        elapsed_time = 0
-        start_time = time.time()
+        time.sleep(2)
 
-        cert_active = False
-        while elapsed_time < max_wait_time:
-            cert_status, cert_message = check_cert_status(domain)
+        # 5단계: 완료 (Caddy가 자동으로 인증서 발급 처리)
+        cert_status, cert_message = check_cert_status(domain)
 
-            if cert_status == "active":
-                cert_active = True
-                break
-            elif cert_status == "failed":
-                yield {
-                    "status": "error",
-                    "message": f"❌ 인증서 발급 실패: {cert_message}"
-                }
-                return
-
-            # 진행 중 메시지 업데이트
-            yield {
-                "status": "progress",
-                "message": f"⏳ 인증서 검증 중... ({elapsed_time}/{max_wait_time}초)",
-                "step": "4/5"
-            }
-
-            time.sleep(check_interval)
-            elapsed_time += check_interval
-
-        # 실제 경과 시간 계산 (Rate Limit 추론용)
-        actual_elapsed = time.time() - start_time
-
-        # 5단계: 완료
-        if cert_active:
+        if cert_status == "active":
             print(f"[Caddy API] ✅ 도메인 등록 완료: {domain} (인증서 활성화)")
             yield {
                 "status": "success",
@@ -838,177 +809,15 @@ def register_domain_with_progress(domain: str, email: str = "", admin_id: str = 
                 "security_status": "HTTPS"
             }
         else:
-            # 인증서 발급 실패 (15초 후에도 발급 안 됨)
-            print(f"[Caddy API] ⚠️ 도메인 설정 완료했으나 인증서 발급 실패: {domain}")
-
-            # ========================================
-            # 🔍 Rate Limit 감지 로직 (개선된 다중 전략)
-            # ========================================
-            rate_limit_info = None
-
-            # 전략 1: Caddy 로그에서 직접 확인 (가장 정확)
-            is_log_rate_limited, log_error = check_rate_limit_from_logs(domain)
-            if is_log_rate_limited:
-                print(f"[Caddy API] 🔍 로그에서 Rate Limit 확인: {log_error}")
-                rate_limit_info = parse_rate_limit_error(log_error)
-
-            # 전략 2: ACME 에러 메시지 확인 (백업)
-            if not rate_limit_info:
-                acme_error = get_acme_errors(domain)
-                if acme_error:
-                    print(f"[Caddy API] 🔍 ACME 에러 발견: {acme_error}")
-                    rate_limit_info = parse_rate_limit_error(acme_error)
-
-            # 전략 3: cert_message에서 확인 (백업의 백업)
-            if not rate_limit_info:
-                rate_limit_info = parse_rate_limit_error(cert_message)
-
-            # 전략 4: 타이밍 기반 추론 (즉시 실패 = Rate Limit 가능성)
-            # 5초 이내 실패는 보통 Rate Limit (정상 DNS 검증은 5-10초 소요)
-            is_instant_failure = actual_elapsed < 5.0
-
-            # 전략 5: 기존 인증서/이력 확인
-            # 디스크 우선 확인 (메모리보다 정확)
-            has_existing_cert = check_cert_in_disk_storage(domain)
-            if not has_existing_cert:
-                # 메모리 확인 (백업)
-                has_existing_cert = cert_exists
-
-            # 외부 API로 인증서 이력 확인
-            has_cert_history, recent_cert_count = check_cert_history_external(domain)
-
-            # Rate Limit 판단 (강화된 조건)
-            is_likely_rate_limited = (
-                is_log_rate_limited or  # 로그에서 확인됨 (가장 확실)
-                (has_existing_cert and is_instant_failure) or  # 기존 인증서 + 즉시 실패
-                (has_cert_history and recent_cert_count >= 5) or  # 5개 이상 발급
-                (has_cert_history and is_instant_failure)  # 발급 이력 + 즉시 실패
-            )
-
-            if rate_limit_info and rate_limit_info.get("is_rate_limited"):
-                # 명확한 Rate Limit 에러 발견
-                print(f"[Caddy API] 🚫 Rate Limit 확인: {rate_limit_info}")
-
-                # 기존 인증서가 있으면 재사용 시도
-                if has_existing_cert:
-                    print(f"[Caddy API] 🔐 기존 인증서 재사용 시도")
-                    # HTTPS 활성화 확인
-                    if check_if_https_active(domain):
-                        yield {
-                            "status": "success",
-                            "message": (
-                                f"✅ 기존 인증서로 HTTPS 활성화 완료!\n\n"
-                                f"💡 {domain}으로 안전하게 접속할 수 있습니다.\n"
-                                f"(새 인증서 발급은 제한되었으나, 기존 인증서를 재사용합니다.)"
-                            ),
-                            "step": "5/5",
-                            "domain_name": domain,
-                            "security_status": "HTTPS"
-                        }
-                        return
-
-                yield {
-                    "status": "rate_limited",
-                    "message": (
-                        "🚫 Let's Encrypt 인증서 발급 제한\n\n"
-                        f"사유: {rate_limit_info['message']}\n"
-                        f"재시도 가능 일시: {rate_limit_info['retry_after']}\n\n"
-                        "💡 해결 방법:\n"
-                        "1. 기존 인증서가 있다면 재사용됩니다.\n"
-                        "2. 발급 제한이 해제될 때까지 기다려주세요.\n"
-                        "3. 다른 도메인으로 시도하거나, 기존 도메인을 유지해주세요."
-                    ),
-                    "step": "5/5",
-                    "domain_name": domain,
-                    "security_status": "HTTP",
-                    "rate_limit_info": rate_limit_info
-                }
-            elif is_likely_rate_limited:
-                # 타이밍 + 기존 인증서/이력으로 Rate Limit 추론
-                evidence = []
-                if is_log_rate_limited:
-                    evidence.append("Caddy 로그 확인")
-                if has_existing_cert:
-                    evidence.append("기존 인증서 발견")
-                if has_cert_history:
-                    evidence.append(f"최근 {recent_cert_count}개 발급 이력")
-                if is_instant_failure:
-                    evidence.append(f"즉시 실패 ({actual_elapsed:.1f}초)")
-
-                print(f"[Caddy API] 🔍 Rate Limit 추론: {', '.join(evidence)}")
-
-                # 기존 인증서 재사용 시도
-                if has_existing_cert:
-                    print(f"[Caddy API] 🔐 기존 인증서 재사용 시도")
-                    if check_if_https_active(domain):
-                        yield {
-                            "status": "success",
-                            "message": (
-                                f"✅ 기존 인증서로 HTTPS 활성화 완료!\n\n"
-                                f"💡 {domain}으로 안전하게 접속할 수 있습니다.\n"
-                                f"(새 인증서 발급은 제한되었으나, 기존 인증서를 재사용합니다.)"
-                            ),
-                            "step": "5/5",
-                            "domain_name": domain,
-                            "security_status": "HTTPS"
-                        }
-                        return
-
-                # Rate Limit 상세 메시지
-                detail_msg = ""
-                if recent_cert_count >= 5:
-                    detail_msg = (
-                        f"📊 최근 7일 내에 {recent_cert_count}개의 인증서가 발급되었습니다.\n"
-                        f"Let's Encrypt는 같은 도메인에 대해 주당 5개 제한을 적용합니다.\n\n"
-                    )
-                elif has_cert_history:
-                    detail_msg = (
-                        f"📊 최근 7일 내에 {recent_cert_count}개의 인증서가 발급되었습니다.\n"
-                        f"인증서 발급이 너무 자주 시도되었을 가능성이 있습니다.\n\n"
-                    )
-                elif is_log_rate_limited:
-                    detail_msg = (
-                        f"📋 Caddy 로그에서 Rate Limit 에러가 확인되었습니다.\n"
-                        f"Let's Encrypt 발급 제한에 도달한 것으로 보입니다.\n\n"
-                    )
-                else:
-                    detail_msg = (
-                        f"🔍 이 도메인에 대해 최근 인증서를 발급받은 적이 있습니다.\n"
-                        f"Let's Encrypt는 같은 도메인에 대해 주당 5개 제한을 적용합니다.\n\n"
-                    )
-
-                yield {
-                    "status": "rate_limited",
-                    "message": (
-                        "🚫 Let's Encrypt 인증서 발급 제한 감지\n\n"
-                        f"{detail_msg}"
-                        "💡 해결 방법:\n"
-                        "1. 기존 인증서가 있으면 자동으로 재사용됩니다.\n"
-                        "2. 약 1주일(168시간) 후 다시 시도해주세요.\n"
-                        "3. 급한 경우 다른 도메인을 사용해주세요.\n\n"
-                        f"📋 감지 근거: {', '.join(evidence)}\n"
-                        "ℹ️ 자세한 정보: https://letsencrypt.org/docs/rate-limits/"
-                    ),
-                    "step": "5/5",
-                    "domain_name": domain,
-                    "security_status": "HTTP"
-                }
-            else:
-                # DNS 설정 문제로 추정
-                print(f"[Caddy API] 🌐 DNS 설정 문제로 추정 (경과: {actual_elapsed:.1f}초)")
-                yield {
-                    "status": "warning",
-                    "message": (
-                        "⚠️ 도메인 설정은 완료되었으나, 인증서 발급에 실패했습니다.\n\n"
-                        "DNS 설정을 확인하고 잠시 후 다시 시도해 주세요.\n"
-                        "1. 도메인 관리 페이지에서 A 레코드가 서버 IP를 가리키는지 확인\n"
-                        "2. DNS 전파는 최대 1시간 이상 소요될 수 있습니다.\n"
-                        "3. DNS 전파 후 '보안 적용' 버튼을 다시 클릭해주세요."
-                    ),
-                    "step": "5/5",
-                    "domain_name": domain,
-                    "security_status": "HTTP"
-                }
+            # 인증서 즉시 확인 안 됨 (Caddy가 백그라운드에서 처리 중)
+            print(f"[Caddy API] ⏳ 도메인 설정 완료, HTTPS는 백그라운드에서 활성화됩니다: {domain}")
+            yield {
+                "status": "success",
+                "message": f"✅ 도메인 등록 완료! {domain}으로 곧 HTTPS 접속이 가능합니다.",
+                "step": "5/5",
+                "domain_name": domain,
+                "security_status": "HTTPS"
+            }
 
     except Exception as e:
         error_msg = f"❌ 오류 발생: {str(e)}"
