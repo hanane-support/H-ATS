@@ -12,9 +12,7 @@ APP_PORT=8000
 # Supervisor 프로그램 이름을 "server_log"로 지정
 SUPERVISOR_PROGRAM_NAME="server_log"
 DB_FILE_NAME="my_admin_config.db"
-# HOME_IP="여기에 IP 주소 입력" # 외부 접근 시 사용할 사용자님의 공인 IP. 예: "61.85.61.62"
-# 또는 아래 명령어로 자동 감지 (SSH 접속 시)
-HOME_IP=$(who am i | awk '{print $5}' | tr -d '()')
+HOME_IP="61.85.61.62" # 외부 접근 시 사용할 사용자님의 공인 IP
 
 #==============================================================
 # 2. 시스템 환경 설정 및 필수 도구 설치
