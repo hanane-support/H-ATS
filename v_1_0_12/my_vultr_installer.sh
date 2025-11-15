@@ -51,7 +51,7 @@ cd "$APP_SUB_DIR" || exit 1
 CURRENT_APP_DIR=$(pwd)
 
 # --------------------------------------------------------------------------
-# DB 파일 초기화 로직 및 IP 정보 수집
+# DB 파일 초기화 로직
 # --------------------------------------------------------------------------
 echo ">> [초기화] 이전 설치된 DB 파일(${DB_FILE_NAME}) 확인 및 삭제 시작..."
 if [ -f "$DB_FILE_NAME" ]; then
@@ -60,15 +60,6 @@ if [ -f "$DB_FILE_NAME" ]; then
 else
     echo "DB 파일이 존재하지 않아 초기화가 필요 없습니다. (최초 설치 상태)"
 fi
-
-# VULTR 서버의 IP 주소 조회
-echo ">> [IP 수집] VULTR 서버의 공인 IP 주소 조회 중..."
-VULTR_IP=$(curl -s https://ifconfig.me/ip || echo "")
-if [ -z "$VULTR_IP" ]; then
-    VULTR_IP=$(curl -s https://api.ipify.org || echo "미설정")
-fi
-echo "✅ VULTR IP: $VULTR_IP"
-echo "✅ MY IP (사용자): $MY_IP"
 # --------------------------------------------------------------------------
 
 echo ">> Python 가상 환경을 ${CURRENT_APP_DIR}에 설치합니다."
@@ -77,55 +68,6 @@ source venv/bin/activate
 pip install gunicorn
 # Caddy Admin API 호출을 위해 'requests' 라이브러리 추가
 pip install -r my_requirements.txt requests
-
-# DB 초기 설정: VULTR IP와 MY IP 저장
-echo ">> [DB 초기화] DB에 VULTR IP와 MY IP 초기값 저장 중..."
-python3 << 'PYTHON_SCRIPT'
-import sqlite3
-import sys
-
-DB_FILE = "${DB_FILE_NAME}"
-VULTR_IP = "${VULTR_IP}"
-MY_IP = "${MY_IP}"
-
-try:
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-
-    # admin 테이블 생성 (없을 경우)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS admin (
-            id TEXT PRIMARY KEY,
-            password_hash TEXT NOT NULL,
-            is_agreed INTEGER DEFAULT 0 NOT NULL
-        )
-    """)
-
-    # domain 테이블 생성
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS domain (
-            admin_id TEXT PRIMARY KEY,
-            domain_name TEXT,
-            ssl_status TEXT DEFAULT 'HTTP' NOT NULL,
-            vultr_ip TEXT,
-            my_ip TEXT,
-            FOREIGN KEY (admin_id) REFERENCES admin (id)
-        )
-    """)
-
-    conn.commit()
-    print(f"✅ DB 초기화 완료: {DB_FILE}")
-    print(f"   - VULTR IP: {VULTR_IP}")
-    print(f"   - MY IP: {MY_IP}")
-
-except Exception as e:
-    print(f"❌ DB 초기화 오류: {e}")
-    sys.exit(1)
-finally:
-    if conn:
-        conn.close()
-PYTHON_SCRIPT
-
 deactivate
 
 #==============================================================

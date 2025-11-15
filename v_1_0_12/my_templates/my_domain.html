@@ -16,20 +16,10 @@
     </p>
     <hr class="card-hr">
 
-    <h3 class="section-header">서버 상태</h3>
+    <h3 class="section-header">보안 상태</h3>
 
     <div class="status-box">
         <div class="status-content">
-            <p>
-                <span class="status-label">MY IP :</span>
-                <span class="status-value-ip" id="actualIpDisplay">IP 주소 확인 중...</span>
-            </p>
-
-            <p>
-                <span class="status-label">VULTR IP :</span>
-                <span class="status-value-ip" id="vultrIpDisplay">{{ vultr_ip | default('미설정') }}</span>
-            </p>
-
             <p>
                 <span class="status-label">도메인 :</span>
                 <span class="status-value" id="currentDomainDisplay">{{ domain_name | default('없음') }}</span>
@@ -49,7 +39,7 @@
         </div>
     </div>
 
-    <h3 class="section-header">도메인 <span class="required-mark">(필수)</span></h3>
+    <h3 class="section-header">도메인 <span class="required-mark">(선택)</span></h3>
 
     <div>
         <input type="text" id="domain-input" placeholder="example.com (영문 도메인 권장)" class="domain-input"
@@ -257,20 +247,20 @@
     }
 
     .status-value-ip {
-        color: #FFEB3B;
+        color: #ffec43;
         font-size: 1.1em;
     }
 
     .status-value-success {
-        color: #8BC34A;
+        color: #abff4b;
     }
 
     .status-value-error {
-        color: #EF5350;
+        color: #ff7070;
     }
 
     .required-mark {
-        color: #EF5350;
+        color: #ffffff;
         font-size: 0.9em;
         font-weight: normal;
     }
@@ -405,7 +395,6 @@
         const modalDomainDisplay = document.getElementById('modal-domain-display');
 
         // 상태 표시 업데이트를 위한 요소
-        const actualIpDisplay = document.getElementById('actualIpDisplay');
         const currentDomainDisplay = document.getElementById('currentDomainDisplay');
         const securityStatusDisplay = document.getElementById('securityStatusDisplay');
 
@@ -446,32 +435,6 @@
             domainInput.value = currentDomain;
         }
         // ----------------------------------------------------
-
-        // ----------------------------------------------------
-        // 1. 공인 IP 주소를 비동기적으로 가져와 표시하는 로직
-        // ----------------------------------------------------
-        const fetchPublicIp = async () => {
-            try {
-                // 통신 오류 문제를 해결하기 위해 텍스트 기반 API로 변경 유지
-                const response = await fetch('https://ifconfig.me/ip');
-                if (!response.ok) {
-                    throw new Error(`IP API 응답 오류: ${response.status}`);
-                }
-
-                const ip = (await response.text()).trim();
-
-                if (ip && (ip.match(/\./g) || ip.match(/:/g))) {
-                    actualIpDisplay.textContent = ip;
-                } else {
-                    actualIpDisplay.textContent = 'IP 주소 형식 오류';
-                }
-            } catch (error) {
-                console.error("공인 IP 주소를 가져오는 중 오류 발생:", error);
-                actualIpDisplay.innerHTML = 'IP 주소 확인 실패 (<a href="https://www.whatismyip.com/" target="_blank" style="color:#FFEB3B; text-decoration: underline;">외부에서 확인</a>)';
-            }
-        };
-
-        fetchPublicIp();
 
         // ----------------------------------------------------
         // 도메인 유효성 검사 및 버튼 활성화
@@ -650,12 +613,6 @@
             releaseModal.classList.add('hidden-modal');
 
             const domainForMessage = currentDomainDisplay.textContent.trim();
-            const ipAddress = actualIpDisplay.textContent.trim(); // IP 주소 가져오기
-
-            if (!ipAddress || ipAddress === 'IP 주소 확인 중...' || ipAddress === 'IP 주소 형식 오류') {
-                showMessage("오류", "유효한 IP 주소를 가져올 수 없습니다. 페이지를 새로고침하거나 잠시 후 다시 시도해주세요.", false);
-                return;
-            }
 
             // 서버 상태의 "보안:" 영역을 실시간 진행 상황 표시로 사용
             securityStatusDisplay.textContent = '⏳ 도메인 해제를 시작합니다...';
@@ -669,7 +626,7 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ ip: ipAddress })
+                    body: JSON.stringify({ domain: domainForMessage })
                 });
 
                 if (!response.ok) {

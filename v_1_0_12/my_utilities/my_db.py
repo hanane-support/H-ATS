@@ -224,20 +224,34 @@ def set_user_agreement_status(admin_id: str, is_agreed: bool) -> bool:
 def get_domain_config(admin_id: str) -> Dict[str, Any]:
     """
     주어진 관리자 ID에 연결된 도메인, 보안, IP 정보를 DB에서 조회합니다.
+    만약 해당 관리자 ID의 레코드가 없으면, __SYSTEM__ ID의 IP 정보를 가져옵니다.
     """
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT domain_name, ssl_status, vultr_ip, my_ip FROM domain WHERE admin_id = ?", (admin_id,))
     result = cursor.fetchone()
-    conn.close()
 
     if result:
+        conn.close()
         return {
             "domain_name": result['domain_name'] if result['domain_name'] else "없음",
             "security_status": result['ssl_status'],
             "vultr_ip": result['vultr_ip'] if result['vultr_ip'] else "미설정",
             "my_ip": result['my_ip'] if result['my_ip'] else "미설정",
+        }
+
+    # 해당 관리자의 레코드가 없으면 __SYSTEM__ 레코드에서 IP 정보 가져오기
+    cursor.execute("SELECT domain_name, ssl_status, vultr_ip, my_ip FROM domain WHERE admin_id = ?", ("__SYSTEM__",))
+    system_result = cursor.fetchone()
+    conn.close()
+
+    if system_result:
+        return {
+            "domain_name": system_result['domain_name'] if system_result['domain_name'] else "없음",
+            "security_status": system_result['ssl_status'],
+            "vultr_ip": system_result['vultr_ip'] if system_result['vultr_ip'] else "미설정",
+            "my_ip": system_result['my_ip'] if system_result['my_ip'] else "미설정",
         }
 
     # 설정되지 않은 경우 기본값 반환
@@ -253,6 +267,8 @@ def update_domain_config(admin_id: str, domain_name: str, ssl_status: str, vultr
     """
     주어진 관리자 ID의 도메인, 보안, IP 정보를 DB에 저장하거나 업데이트합니다 (UPSERT).
 
+    만약 vultr_ip나 my_ip가 None이면 __SYSTEM__ 레코드에서 IP 정보를 가져와서 사용합니다.
+
     Args:
         admin_id: 관리자 ID
         domain_name: 도메인명
@@ -264,6 +280,17 @@ def update_domain_config(admin_id: str, domain_name: str, ssl_status: str, vultr
     cursor = conn.cursor()
 
     try:
+        # IP 정보가 제공되지 않으면 __SYSTEM__ 레코드에서 가져오기
+        if vultr_ip is None or my_ip is None:
+            cursor.execute("SELECT vultr_ip, my_ip FROM domain WHERE admin_id = ?", ("__SYSTEM__",))
+            system_result = cursor.fetchone()
+
+            if system_result:
+                if vultr_ip is None:
+                    vultr_ip = system_result['vultr_ip']
+                if my_ip is None:
+                    my_ip = system_result['my_ip']
+
         cursor.execute(
             """
             INSERT INTO domain (admin_id, domain_name, ssl_status, vultr_ip, my_ip)

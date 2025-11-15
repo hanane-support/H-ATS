@@ -43,24 +43,22 @@ def sse_event(data: dict) -> str:
 async def domain_manager(request: Request):
     """
     도메인 설정 페이지(my_domain.html)를 렌더링하고,
-    DB에 저장된 현재 도메인, 보안 상태, IP 정보를 전달합니다.
+    DB에 저장된 현재 도메인, 보안 상태를 전달합니다.
     """
     admin_id = request.session.get("user_id")
     if not admin_id:
         # admin_id가 없으면 로그인 페이지로 리디렉션 (또는 오류 처리)
         # 이 부분은 실제 앱의 인증 정책에 맞게 수정해야 합니다.
         # 여기서는 간단히 빈 컨텍스트로 렌더링하거나, 기본값을 사용합니다.
-        domain_config = {"domain_name": "없음", "security_status": "HTTP", "vultr_ip": "미설정", "my_ip": "미설정"}
+        domain_config = {"domain_name": "없음", "security_status": "HTTP"}
     else:
-        # DB에서 현재 도메인, 보안 상태, IP 정보를 가져옵니다.
+        # DB에서 현재 도메인, 보안 상태를 가져옵니다.
         domain_config = get_domain_config(admin_id)
 
     context = {
         "request": request,
         "domain_name": domain_config.get("domain_name", "없음"),
-        "security_status": domain_config.get("security_status", "HTTP"),
-        "vultr_ip": domain_config.get("vultr_ip", "미설정"),
-        "my_ip": domain_config.get("my_ip", "미설정")
+        "security_status": domain_config.get("security_status", "HTTP")
     }
 
     return templates.TemplateResponse(
@@ -169,17 +167,17 @@ async def release_security(request: Request):
             content={"success": False, "message": "인증되지 않은 요청입니다."}
         )
 
-    ip_address = None
+    domain_to_release = None
     try:
         data = await request.json()
-        ip_address = data.get("ip")
-        if not ip_address:
-            print("❌ 요청 본문에 IP 주소 정보가 없습니다.")
+        domain_to_release = data.get("domain")
+        if not domain_to_release:
+            print("❌ 요청 본문에 도메인 정보가 없습니다.")
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "message": "IP 주소 정보가 요청 본문에 포함되어 있지 않습니다."}
+                content={"success": False, "message": "도메인 정보가 요청 본문에 포함되어 있지 않습니다."}
             )
-        print(f"✅ 클라이언트에서 받은 해제 요청 IP: {ip_address}")
+        print(f"✅ 클라이언트에서 받은 해제 요청 도메인: {domain_to_release}")
         print(f"✅ 관리자 ID: {admin_id}")
     except json.JSONDecodeError:
         print("❌ JSON 디코딩 오류")
@@ -197,8 +195,8 @@ async def release_security(request: Request):
     # SSE 스트림 생성
     async def event_stream():
         """도메인 해제 진행 상황을 SSE로 스트리밍"""
-        print(f"🚀 도메인 해제 시작: IP={ip_address}")
-        for progress in release_domain_with_progress(ip_address):
+        print(f"🚀 도메인 해제 시작: domain={domain_to_release}")
+        for progress in release_domain_with_progress(domain_to_release):
             print(f"📡 SSE 전송: {progress}")
             yield sse_event(progress)
 

@@ -73,26 +73,26 @@ def register_domain_with_progress_mock(domain: str, email: str = "") -> Generato
     print(f"[Mock Caddy API] ✅ 가상 도메인 등록 완료: {domain}")
     yield {
         "status": "success",
-        "message": f"✅ [모의 테스트 성공] HTTPS 인증 완료! {domain}으로 안전하게 접속할 수 있습니다.",
+        "message": f"✅ [모의 테스트 성공]<br>HTTPS 인증 완료!<br>{domain}으로 안전하게 접속할 수 있습니다.",
         "step": "5/5",
         "domain_name": domain,
         "security_status": "HTTPS"
     }
 
 
-def release_domain_with_progress_mock(ip_address: str) -> Generator[Dict[str, str], None, None]:
+def release_domain_with_progress_mock(domain: str) -> Generator[Dict[str, str], None, None]:
     """
     도메인 해제를 가상으로 시뮬레이션합니다. (SSE용)
 
     실제 Caddy API를 호출하지 않고, 진행 상황을 모의로 생성합니다.
 
     Args:
-        ip_address: 현재 서버 IP 주소 (테스트용, 메시지 출력용)
+        domain: 해제할 도메인 (테스트용, 메시지 출력용)
 
     Yields:
         {"status": "progress/success/error", "message": "메시지"} 형식의 딕셔너리
     """
-    print(f"[Mock Caddy API] 🎭 모의 도메인 해제 시작: IP={ip_address}")
+    print(f"[Mock Caddy API] 🎭 모의 도메인 해제 시작: domain={domain}")
 
     # 1단계: 현재 설정 가져오기
     yield {
@@ -140,11 +140,10 @@ def release_domain_with_progress_mock(ip_address: str) -> Generator[Dict[str, st
     print(f"[Mock Caddy API] ✅ 가상 HOME IP 전용 설정 적용 성공")
 
     # 완료
-    mock_home_ip = "127.0.0.1"  # Windows 로컬 테스트용
-    print(f"[Mock Caddy API] ✅ 가상 도메인 해제 완료: IP={ip_address}")
+    print(f"[Mock Caddy API] ✅ 가상 도메인 해제 완료: domain={domain}")
     yield {
         "status": "success",
-        "message": f"✅ [모의 테스트 성공] 도메인 해제 완료! HOME IP ({mock_home_ip})로만 HTTP 접근이 가능합니다.",
+        "message": f"✅ [모의 테스트 성공]<br>도메인 ({domain}) 해제 완료!<br>HTTP로 되돌려졌습니다.",
         "step": "5/5",
         "domain_name": "없음",
         "security_status": "HTTP"

@@ -284,14 +284,14 @@ def register_domain_with_progress(domain: str, email: str = "") -> Generator[Dic
         }
 
 
-def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], None, None]:
+def release_domain_with_progress(domain: str) -> Generator[Dict[str, str], None, None]:
     """
-    도메인을 해제하고 IP만 남기며, 진행 상황을 실시간으로 yield합니다. (SSE용)
+    도메인을 해제하고 HTTP로 되돌리며, 진행 상황을 실시간으로 yield합니다. (SSE용)
 
     환경 변수 CADDY_MOCK_MODE=true로 설정하면 모의 테스트 모드로 동작합니다.
 
     Args:
-        ip_address: 현재 서버 IP 주소
+        domain: 해제할 도메인 (표시 용도)
 
     Yields:
         {"status": "progress/success/error", "message": "메시지"} 형식의 딕셔너리
@@ -299,7 +299,7 @@ def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], N
     # 모의 모드일 경우 mock 함수 사용
     if MOCK_MODE:
         from my_utilities.my_caddy_api_mock import release_domain_with_progress_mock
-        yield from release_domain_with_progress_mock(ip_address)
+        yield from release_domain_with_progress_mock(domain)
         return
 
     try:
@@ -373,7 +373,7 @@ def release_domain_with_progress(ip_address: str) -> Generator[Dict[str, str], N
         # 3단계: 완료
         yield {
             "status": "success",
-            "message": f"✅ 도메인 해제 완료! IP ({ip_address})로 HTTP 접근이 가능합니다.",
+            "message": f"✅ 도메인 ({domain}) 해제 완료! HTTP로 되돌려졌습니다.",
             "step": "3/3",
             "domain_name": "없음",
             "security_status": "HTTP"
@@ -409,18 +409,18 @@ def register_domain(domain: str, email: str = "admin@hanane.kr") -> Tuple[bool, 
         return False, f"도메인 등록 실패: {e}"
 
 
-def release_domain(ip_address: str) -> Tuple[bool, str]:
+def release_domain(domain: str) -> Tuple[bool, str]:
     """
     도메인을 해제합니다. (비-SSE 버전, 백업용)
 
     Args:
-        ip_address: 현재 서버 IP 주소
+        domain: 해제할 도메인
 
     Returns:
         (성공 여부, 메시지)
     """
     try:
-        for progress in release_domain_with_progress(ip_address):
+        for progress in release_domain_with_progress(domain):
             if progress["status"] == "error":
                 return False, progress["message"]
             elif progress["status"] == "success":
